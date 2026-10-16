@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Cozy Cove</title>
+<meta name="description" content="A cozy island game for the whole family. Fish, garden and fix up the island together — up to 4 players.">
+<meta name="theme-color" content="#2fc6c8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cozy Cove">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<!--%SPLASH%-->
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preload" href="fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin>
+<style>/*%CSS%*/</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="gl" aria-label="Cozy Cove game world"></canvas>
+  <div id="ui"></div>
+  <div id="boot" class="boot">
+    <div class="boot-inner">
+      <div class="boot-logo"><span class="boot-sun"></span><span class="boot-wave"></span></div>
+      <div class="boot-title">Cozy Cove</div>
+      <div class="boot-bar"><i id="boot-fill"></i></div>
+      <div class="boot-msg" id="boot-msg">Packing the picnic basket…</div>
+    </div>
+  </div>
+</div>
+<noscript>Cozy Cove needs JavaScript turned on.</noscript>
+<script type="module" src="%APP%"></script>
+</body>
+</html>

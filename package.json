@@ -1,0 +1,22 @@
+{
+  "name": "cozy-cove",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cozy Cove - a relaxing island game for the whole family (up to 4 players), made for iPhone.",
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "dev": "node tools/build.mjs --watch",
+    "serve": "node tools/serve.mjs"
+  },
+  "dependencies": {
+    "peerjs": "1.5.5",
+    "three": "0.170.0",
+    "trystero": "0.25.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10",
+    "peer": "1.0.2",
+    "ws": "8.18.3"
+  }
+}
