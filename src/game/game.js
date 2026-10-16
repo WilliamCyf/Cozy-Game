@@ -14,6 +14,8 @@ import { U } from '../render/materials.js';
 import * as L from '../world/layout.js';
 import { SAVE_KEY } from './state.js';
 
+const EMOTE_ICON = { wave: '👋', heart: '❤️', dance: '💃', cheer: '🎉', sit: '🪑', sleep: '💤', laugh: '😄' };
+
 export class Game {
   constructor(o) {
     Object.assign(this, o); // R, rig, scene, world, spawns, session, profile, settings, audio, input, uiRoot, saveProfileFn, saveSettingsFn
@@ -52,6 +54,7 @@ export class Game {
     session.on('netstatus', () => this.ui.renderFamily());
     session.on('lost', () => this.onLost());
     if (session.isHost) session.snapExtra = () => ({ cat: this.critters.catState() });
+    session.posProvider = () => this.players.packet();
 
     this.players.syncRoster();
     this.ui.renderFamily();
@@ -107,6 +110,7 @@ export class Game {
         const c = this.players.charOf(f.pid);
         const r = this.players.remotes.get(f.pid);
         if (c && r) {
+          this.fx.label(r.x, r.y + 2.6, r.z, EMOTE_ICON[f.e] || '✨', 'big');
           if (f.e === 'heart') this.fx.hearts(r.x, r.y, r.z, 5);
           if (f.e === 'dance') this.fx.notes(r.x, r.y, r.z, 3);
           if (f.e === 'wave') {
@@ -223,6 +227,7 @@ export class Game {
     if (this.fishing.active) return;
     this.players.emote(e);
     const P = this.players.local;
+    this.fx.label(P.x, P.y + 2.6, P.z, EMOTE_ICON[e] || '✨', 'big');
     if (e === 'heart') this.fx.hearts(P.x, P.y, P.z, 5);
     if (e === 'dance') this.fx.notes(P.x, P.y, P.z, 3);
     if (e === 'wave') {
@@ -437,13 +442,13 @@ export class Game {
     this.players.update(dt, now);
     this.fishing.update(dt, this.input.move);
     const P = this.players.local;
-    for (const p of this.players.all()) this.blobs.add(p.x, p.y, p.z, 1.05);
-    const plist = [...this.players.all()];
+    const plist = this.players.all();
+    for (let i = 0; i < plist.length; i++) this.blobs.add(plist[i].x, plist[i].y, plist[i].z, 1.05);
     this.critters.update(dt, this.time, P.x, P.z, plist, S.isHost);
     this.blobs.end();
     this.interact.update(dt);
     this.worldview.update(dt, this.time, this.daynight.night, P.x, P.z);
-    if (this.daynight.rain > 0.05) this.fx.rain(P.x, P.z, this.daynight.rain);
+    if (this.daynight.rain > 0.05) this.fx.rain(P.x, P.z, this.daynight.rain, dt);
     this.fishing.draw(this.time);
     this.fx.update(dt);
     this.ui.update(dt);

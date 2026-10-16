@@ -49,8 +49,9 @@ export class FX {
         varying vec4 vCol;
         varying float vSpr;
         void main() {
+          // the sprite sheet is stored upside-down on the GPU, so flip the row
           vec2 cell = vec2(mod(vSpr, 4.0), floor(vSpr / 4.0));
-          vec2 uv = (cell + vec2(gl_PointCoord.x, gl_PointCoord.y)) * 0.25;
+          vec2 uv = vec2((cell.x + gl_PointCoord.x) * 0.25, 1.0 - (cell.y + gl_PointCoord.y) * 0.25);
           float a = texture2D(uMap, uv).a * vCol.a;
           if (a < 0.01) discard;
           gl_FragColor = vec4(vCol.rgb, a);
@@ -136,10 +137,13 @@ export class FX {
       this.spawn(x, y, z, Math.cos(a) * Math.cos(e) * s, Math.sin(e) * s + 1, Math.sin(a) * Math.cos(e) * s, 1.6, 0.5, SPRITE.star, c[0], c[1], c[2], 1, 3);
     }
   }
-  rain(cx, cz, amount) {
-    const n = Math.round(amount * 6);
+  rain(cx, cz, amount, dt) {
+    // time-based (same shower whatever the frame rate)
+    this.rainAcc = (this.rainAcc || 0) + amount * 190 * dt;
+    const n = Math.floor(this.rainAcc);
+    this.rainAcc -= n;
     for (let i = 0; i < n; i++) {
-      this.spawn(cx + (Math.random() - 0.5) * 40, 14, cz + (Math.random() - 0.5) * 40, 0, -22, 0, 0.62, 0.55, SPRITE.rain, 0.85, 0.92, 1, 0.55, 0);
+      this.spawn(cx + (Math.random() - 0.5) * 34, 14, cz + (Math.random() - 0.5) * 44 + 6, -1.5, -24, 0, 0.58, 1.5, SPRITE.rain, 0.9, 0.95, 1, 0.6, 0);
     }
   }
 

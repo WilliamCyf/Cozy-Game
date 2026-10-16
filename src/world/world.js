@@ -9,7 +9,7 @@ import {
   U, makePropMaterial, makeOutlineMaterial, makeTerrainMaterial, makeWaterMaterial, makeWaterfallMaterial, makeGlowMaterial,
 } from '../render/materials.js';
 import { buildWalkGrid } from './walk.js';
-import { smoothstep, mulberry32, distToPolyline } from '../util/math.js';
+import { smoothstep, mulberry32, distToPolyline, distToSegment } from '../util/math.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -23,7 +23,9 @@ function flatten(terrain, x0, z0, x1, z1, target, feather, mode) {
     for (let i = i0; i <= i1; i++) {
       const x = -L.WORLD_HALF + i * CELL;
       const dx = Math.max(x0 - x, x - x1, 0), dz = Math.max(z0 - z, z - z1, 0);
-      const w = 1 - smoothstep(0, feather, Math.hypot(dx, dz));
+      // never flatten the ramp up to the forest (it would leave a step too steep to climb)
+      const rampD = distToSegment(x, z, L.RAMP.ax, L.RAMP.az, L.RAMP.bx, L.RAMP.bz);
+      const w = (1 - smoothstep(0, feather, Math.hypot(dx, dz))) * smoothstep(L.RAMP.width * 0.5 + 0.8, L.RAMP.width * 0.5 + 3, rampD);
       if (w <= 0) continue;
       const k = j * N + i;
       // 'max' only lowers ground that is too high; 'set' pulls it to the target either way
@@ -271,7 +273,10 @@ export async function buildWorld(scene, onProgress = () => {}) {
 
   // Night-time glows: lanterns + fireflies
   const glowPts = [], glowData = [];
-  for (const [x, y, z, s] of ctx.lights) { glowPts.push(x, y, z); glowData.push(2.6 * s, Math.random(), 0, 1); }
+  for (const [x, y, z, s] of ctx.lights) {
+    glowPts.push(x, y, z); glowData.push(2.2 * s, Math.random(), 0, 1); // the bright little flame
+    glowPts.push(x, y - 1.2, z); glowData.push(7.5 * s, Math.random(), 2, 0.5); // a soft pool of warm light
+  }
   const rr = mulberry32(55);
   for (let i = 0; i < 90; i++) {
     let x, z, ok = false;

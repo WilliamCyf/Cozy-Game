@@ -267,6 +267,9 @@ export class Session extends Emitter {
   }
 
   setMyPos(s) { this.myPos = s; }
+  // the game gives us a function that builds our position message when we need it
+  get myPos() { return this._myPos || this.posProvider?.() || null; }
+  set myPos(v) { this._myPos = v; }
 
   update(dt, now) {
     if (this.role === 'host') {
@@ -279,7 +282,7 @@ export class Session extends Emitter {
       if (this.snapT >= SNAP_MS) {
         this.snapT = 0;
         const me = this.online.get(this.pid);
-        if (me) { me.s = this.myPos; me.t = now; }
+        if (me) { me.s = this.posProvider?.() || null; me.t = now; }
         const p = {};
         for (const [pid, o] of this.online) if (o.s) p[pid] = o.s;
         this.flush();
@@ -289,9 +292,9 @@ export class Session extends Emitter {
       if (this.saveT > 12 && this.dirty) this.save();
     } else if (this.role === 'guest' && this.connected) {
       this.snapT += dt * 1000;
-      if (this.snapT >= SNAP_MS && this.myPos) {
+      if (this.snapT >= SNAP_MS && this.posProvider) {
         this.snapT = 0;
-        this.link?.send({ k: 'pos', s: this.myPos });
+        this.link?.send({ k: 'pos', s: this.posProvider() });
       }
       // keep the clock moving smoothly between snapshots
       if (this.state) {

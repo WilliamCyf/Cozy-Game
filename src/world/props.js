@@ -515,7 +515,7 @@ export function lighthouse(ctx, crystalB) {
   }
   B.add(cylinder(0, 1.35, 1.0, 10), M(x, by + 7.55, z), C.blue, { recv: 0 });
   // the crystal is separate (it lights up when the family restores the lighthouse)
-  crystalB.add(blob(0.55, 0, 0, 1, 1.7), M(0, 0, 0), C.crystal, { recv: 0, glow: 1 });
+  crystalB.add(blob(0.55, 0, 0, 1, 1.7), M(0, 0, 0), C.crystal, { recv: 0, glow: 2 });
   ctx.shadows.push({ t: 'l', w: 2.3, a: 1, pts: [[x, z], [x + shiftX(7), z + shiftZ(7)]] });
   ctx.shadows.push({ t: 'c', x, z, r: 2.4, a: 0.35 });
   ctx.colliders.push({ t: 'c', x, z, r: 2.3 });

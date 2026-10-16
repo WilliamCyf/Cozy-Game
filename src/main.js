@@ -177,6 +177,9 @@ async function startJoin(code) {
 // ---------------------------------------------------------------- the loop
 let last = performance.now();
 let titleT = 0;
+// ?perf: measure how many milliseconds each frame's work takes (game logic vs. preparing the drawing)
+const perf = params.has('perf') ? { n: 0, update: 0, render: 0, maxUpdate: 0 } : null;
+if (perf) window.__perf = perf;
 function loop(now) {
   requestAnimationFrame(loop);
   if (!R.shouldRender(now)) return;
@@ -184,8 +187,15 @@ function loop(now) {
   last = now;
   try {
     if (game) {
+      const t0 = performance.now();
       game.update(dt, now);
+      const t1 = performance.now();
       game.render();
+      if (perf) {
+        const t2 = performance.now();
+        perf.n++; perf.update += t1 - t0; perf.render += t2 - t1;
+        perf.maxUpdate = Math.max(perf.maxUpdate, t1 - t0);
+      }
     } else {
       // title screen: drift the camera gently over the island
       titleT += dt;

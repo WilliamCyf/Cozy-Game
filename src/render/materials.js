@@ -69,7 +69,9 @@ void main() {
     c *= instanceColor;
   #endif
   vec3 col = c * (hemi(n) + uSunColor * lit);
-  col = mix(col, c * 1.25 + vec3(0.12, 0.08, 0.0), aAux.z * uGlow);
+  // things that light up at night: windows & lanterns glow warm, crystals keep their colour
+  vec3 glowCol = aAux.z > 1.5 ? c * 1.35 + vec3(0.1) : vec3(1.0, 0.8, 0.42) * 1.15;
+  col = mix(col, glowCol, min(aAux.z, 1.0) * uGlow);
   vColor = col;
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`;
@@ -229,21 +231,21 @@ void main() {
   float foam = max(foam1 * holes, foam2 * 0.75);
   foam *= step(-0.02, depth);
 
-  // sparkles where sunlight glints (clustered, not everywhere)
-  float cluster = smoothstep(0.55, 0.75, texture2D(uNoise, vW * 0.012 + vec2(t * 0.002, 0.0)).r);
-  float s1 = texture2D(uNoise, vW * 0.34 + vec2(t * 0.03, t * 0.008)).g;
-  float s2 = texture2D(uNoise, vW * 0.43 - vec2(t * 0.012, t * 0.033)).g;
-  float spark = smoothstep(0.7, 0.76, s1 * s2 * 1.6) * cluster * (0.6 + 0.4 * sunAmt) * smoothstep(0.3, 1.5, d);
+  // sun glints: little wavy highlights in a few patches (not everywhere)
+  float cluster = smoothstep(0.6, 0.8, texture2D(uNoise, vW * 0.011 + vec2(t * 0.002, -t * 0.001)).r);
+  float s1 = texture2D(uNoise, vW * 0.16 + vec2(t * 0.02, t * 0.006)).g;
+  float s2 = texture2D(uNoise, vW * 0.21 - vec2(t * 0.009, t * 0.018)).a;
+  float spark = smoothstep(0.62, 0.7, s1 * 0.55 + s2 * 0.55) * cluster * (0.35 + 0.45 * sunAmt) * smoothstep(0.4, 1.6, d) * (1.0 - uRain);
 
-  // rain drop rings
+  // rain drop rings: small, few and gentle
   if (uRain > 0.01) {
-    vec2 cell = floor(vW * 0.7);
-    vec2 f = fract(vW * 0.7) - 0.5;
+    vec2 cell = floor(vW * 1.3);
+    vec2 f = fract(vW * 1.3) - 0.5;
     float rnd = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
-    float ph = fract(t * 0.9 + rnd);
-    float r = length(f - (vec2(rnd, fract(rnd * 7.13)) - 0.5) * 0.5);
-    float ring = (1.0 - smoothstep(0.0, 0.05, abs(r - ph * 0.45))) * (1.0 - ph);
-    col += ring * 0.25 * uRain;
+    float ph = fract(t * 0.8 + rnd);
+    float r = length(f - (vec2(rnd, fract(rnd * 7.13)) - 0.5) * 0.4);
+    float ring = (1.0 - smoothstep(0.0, 0.035, abs(r - ph * 0.3))) * (1.0 - ph) * step(0.55, fract(rnd * 3.7));
+    col += ring * 0.16 * uRain;
   }
 
   float sh = smoothstep(0.3, 0.62, m.b);
@@ -360,7 +362,10 @@ export function makeGlowMaterial(map) {
         float k = aData.z;
         float ph = aData.y;
         float vis;
-        if (k > 0.5) { // firefly: drift around
+        if (k > 1.5) { // big soft pool of lantern light
+          vis = uGlow * 0.55;
+          vC = vec3(1.0, 0.66, 0.32);
+        } else if (k > 0.5) { // firefly: drift around
           p.x += sin(uTime * 0.7 + ph * 13.0) * 1.2;
           p.z += cos(uTime * 0.55 + ph * 7.0) * 1.2;
           p.y += sin(uTime * 1.3 + ph * 5.0) * 0.4;
@@ -380,7 +385,7 @@ export function makeGlowMaterial(map) {
       varying float vI;
       varying vec3 vC;
       void main() {
-        vec2 uv = gl_PointCoord * 0.25; // first cell of the atlas (soft dot)
+        vec2 uv = vec2(gl_PointCoord.x * 0.25, 1.0 - gl_PointCoord.y * 0.25); // first cell of the atlas (soft dot)
         float a = texture2D(uMap, uv).a;
         gl_FragColor = vec4(vC * a * vI, 1.0);
       }`,

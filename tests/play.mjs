@@ -81,6 +81,97 @@ try {
     await shot(p, 'fish5');
     const res = await p.evaluate(() => ({ basket: window.__game.session.state.basket, journal: window.__game.session.state.journal, st: window.__game.fishing.state }));
     console.log(JSON.stringify(res));
+  } else if (scenario === 'flow') {
+    const p = await newPhone('A');
+    await p.goto(base + '?nosw&nopeer&notry&autostart=host&name=Mom&notut&debug');
+    await p.waitForFunction(() => window.__game, null, { timeout: 60000 });
+    await wait(1200);
+    const log = (m) => console.log(m);
+    const R = (req) => p.evaluate((r) => window.__game.session.request(r), req);
+    const S = () => p.evaluate(() => JSON.parse(JSON.stringify(window.__game.session.state)));
+    let s = await S();
+    // 1) pick up a beach item
+    const [iid, it] = Object.entries(s.items)[0];
+    let r = await R({ a: 'pick', id: iid }); log(`pick ${it.k}: ${r.ok}`);
+    // 2) shake a palm, pick the coconut
+    r = await R({ a: 'shake', i: 0 }); log(`shake: ${JSON.stringify(r)}`);
+    s = await S();
+    const coco = Object.entries(s.items).find(([, v]) => v.k === 'coconut');
+    r = await R({ a: 'pick', id: coco?.[0] }); log(`coconut picked: ${r.ok}`);
+    r = await R({ a: 'shake', i: 0 }); log(`shake again (should be empty): ${JSON.stringify(r)}`);
+    // 3) bush
+    r = await R({ a: 'bush', i: 0 }); log(`bush: ${JSON.stringify(r)}`);
+    // 4) garden: plant -> water -> grow -> harvest
+    r = await R({ a: 'plant', i: 0, crop: 'carrot' }); log(`plant: ${r.ok}`);
+    r = await R({ a: 'water', i: 0 }); log(`water: ${r.ok}`);
+    for (let st = 0; st < 3; st++) {
+      await p.evaluate(() => { const pl = window.__game.session.state.plots[0]; pl.grow = 999; pl.water = true; });
+      await wait(1600);
+    }
+    s = await S(); log(`plot after growing: ${JSON.stringify(s.plots[0])}`);
+    await p.evaluate(() => { const g = window.__game; g.players.local.x = g.world.plots[0].x; g.players.local.z = g.world.plots[0].z + 1.6; g.rig.snap(); });
+    await wait(800);
+    await shot(p, 'flow-garden');
+    r = await R({ a: 'harvest', i: 0 }); log(`harvest: ${JSON.stringify(r)}`);
+    r = await R({ a: 'plant', i: 1, crop: 'carrot' }); r = await R({ a: 'plant', i: 2, crop: 'strawberry' }); r = await R({ a: 'water', i: 2 });
+    // 5) shop + sell
+    r = await R({ a: 'buy', i: 0 }); log(`buy seeds: ${r.ok}`);
+    r = await R({ a: 'cheat', coins: 500, item: 'driftwood', n: 20 });
+    r = await R({ a: 'buyHat', hat: 'bunny' }); log(`buy bunny hat: ${r.ok}`);
+    r = await R({ a: 'sell', item: 'driftwood', n: 2 }); log(`sell: ${JSON.stringify(r)}`);
+    // 6) cook (give ingredients first)
+    await R({ a: 'cheat', item: 'fish:sardine', n: 3 }); await R({ a: 'cheat', item: 'carrot', n: 2 });
+    r = await R({ a: 'cook', r: 'soup' }); log(`cook soup: ${r.ok}`);
+    r = await R({ a: 'cook', r: 'pie' }); log(`cook pie without pumpkin (should fail): ${JSON.stringify(r)}`);
+    // 7) family projects
+    r = await R({ a: 'donate', p: 'path', need: 'driftwood', n: 6 }); log(`donate driftwood: ${JSON.stringify(r)}`);
+    r = await R({ a: 'donate', p: 'path', need: 'coins', n: 30 }); log(`donate coins: ${JSON.stringify(r)}`);
+    s = await S(); log(`path project done: ${s.projects.path.done}`);
+    const walkOk = await p.evaluate(() => window.__game.world.walk.canWalk(8.2, -10.6)); log(`ramp walkable after project: ${walkOk}`);
+    r = await R({ a: 'donate', p: 'festival', need: 'coins', n: 10 }); log(`festival before others (should fail): ${JSON.stringify(r)}`);
+    r = await R({ a: 'donate', p: 'bridge', need: 'driftwood', n: 12 }); r = await R({ a: 'donate', p: 'bridge', need: 'coins', n: 120 }); log(`bridge: ${JSON.stringify(r)}`);
+    const bridgeOk = await p.evaluate(() => window.__game.world.walk.canWalk(44, 15.5)); log(`bridge gap walkable: ${bridgeOk}`);
+    await wait(1500);
+    await shot(p, 'flow-celebrate');
+    await p.evaluate(() => window.__game.ui.hideOverlay());
+    // 8) mail
+    r = await R({ a: 'mail' }); log(`mail: ${JSON.stringify(r).slice(0, 120)}`);
+    r = await R({ a: 'mail' }); log(`mail again (should be empty): ${r.ok}`);
+    // 9) every panel opens without errors
+    for (const name of ['basket', 'journal', 'board', 'shop', 'sell', 'cook', 'family', 'look', 'settings', 'help', 'menu']) {
+      await p.evaluate((n) => window.__game.openPanel(n), name);
+      await wait(500);
+      await shot(p, 'panel-' + name);
+      await p.evaluate(() => window.__game.ui.closeSheet());
+      await wait(300);
+    }
+    // 10) catch card
+    await p.evaluate(() => window.__game.ui.showCatch({ fish: 'tuna', size: 88, res: { isNew: true, record: false } }));
+    await wait(700);
+    await shot(p, 'catch-card');
+    await p.evaluate(() => document.querySelector('.catch .btn')?.dispatchEvent(new PointerEvent('pointerdown')));
+    // 11) night + rain
+    await p.evaluate(() => { const g = window.__game; g.players.local.x = 2; g.players.local.z = 22; g.rig.snap(); g.session.state.time = 22.5; });
+    await wait(2500);
+    await shot(p, 'night');
+    await R({ a: 'cheat', weather: 'rain' });
+    await p.evaluate(() => { window.__game.session.state.time = 13; });
+    await wait(4000);
+    await shot(p, 'rain');
+    s = await S(); log(`final coins ${s.coins}, basket ${JSON.stringify(s.basket)}`);
+  } else if (scenario === 'scenes') {
+    const p = await newPhone('A');
+    await p.goto(base + '?nosw&nopeer&notry&autostart=host&name=Mom&notut&debug');
+    await p.waitForFunction(() => window.__game, null, { timeout: 60000 });
+    await wait(1500);
+    const place = process.env.PLACE || '6,37';
+    const [px, pz] = place.split(',').map(Number);
+    await p.evaluate(([x, z]) => { const g = window.__game; g.players.local.x = x; g.players.local.z = z; g.rig.snap(); g.ui.hud.style.display = 'none'; }, [px, pz]);
+    for (const [n, t, w] of [['noon', 12, 'sun'], ['sunset', 18.4, 'sun'], ['night', 22, 'sun'], ['rain', 13, 'rain']]) {
+      await p.evaluate(async ([t, w]) => { const g = window.__game; await g.session.request({ a: 'cheat', weather: w }); g.session.state.time = t; g.daynight.rain = w === 'rain' ? 1 : 0; }, [t, w]);
+      await wait(2500);
+      await shot(p, 'scene-' + n);
+    }
   } else if (scenario === 'landscape') {
     const p = await newPhone('A', true);
     await p.goto(base + '?nosw&autostart=host&name=Dad&notut&fps');

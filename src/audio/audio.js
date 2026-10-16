@@ -23,7 +23,7 @@ export class Audio {
   // Browsers only allow sound after the player touches the screen.
   unlock() {
     if (this.ctx) {
-      if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+      if (this.ctx.state === 'suspended' && !this.muted) this.ctx.resume().catch(() => {});
       return;
     }
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -61,12 +61,13 @@ export class Audio {
     this.noise = this.makeNoise();
     this.startAmbience();
     this.started = true;
+    this.setVolumes(this.musicVol, this.sfxVol);
     this.nextBar = ctx.currentTime + 0.3;
     this.timer = setInterval(() => this.schedule(), 120);
     document.addEventListener('visibilitychange', () => {
       if (!this.ctx) return;
       if (document.hidden) this.ctx.suspend().catch(() => {});
-      else this.ctx.resume().catch(() => {});
+      else if (!this.muted) this.ctx.resume().catch(() => {});
     });
   }
 
@@ -120,6 +121,10 @@ export class Audio {
     this.musicVol = music;
     this.sfxVol = sfx;
     if (!this.ctx) return;
+    // both off? let the audio chip sleep completely (saves battery)
+    this.muted = music <= 0.01 && sfx <= 0.01;
+    if (this.muted) { this.ctx.suspend().catch(() => {}); return; }
+    if (this.ctx.state === 'suspended' && !document.hidden) this.ctx.resume().catch(() => {});
     const t = this.ctx.currentTime;
     this.music.gain.setTargetAtTime(music * 0.5, t, 0.2);
     this.sfx.gain.setTargetAtTime(sfx, t, 0.1);

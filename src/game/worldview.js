@@ -29,8 +29,8 @@ function itemGeometry(kind) {
       b.add(cylinder(0.04, 0.06, 0.4, 5), M(0.15, 0.1, 0.05, 1.2, 0, 1.0), hex('#a8937b'), o);
       break;
     case 'seaglass':
-      b.add(blob(0.14, 0, 0, 1, 1.3), M(0, 0.12, 0), hex('#7fe0e8'), { ...o, glow: 1 });
-      b.add(blob(0.1, 0, 0, 2, 1.2), M(0.12, 0.08, 0.06), hex('#9cf0c8'), { ...o, glow: 1 });
+      b.add(blob(0.14, 0, 0, 1, 1.3), M(0, 0.12, 0), hex('#7fe0e8'), { ...o, glow: 2 });
+      b.add(blob(0.1, 0, 0, 2, 1.2), M(0.12, 0.08, 0.06), hex('#9cf0c8'), { ...o, glow: 2 });
       break;
     case 'mushroom':
       b.add(cylinder(0.06, 0.07, 0.22, 6), M(0, 0, 0), hex('#f6efe0'), o);

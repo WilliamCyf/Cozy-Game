@@ -6,17 +6,17 @@ import { smoothstep } from '../util/math.js';
 
 // hour: [sun, sky, ground, shallow, mid, deep, night(0..1)]
 const KEYS = [
-  [0, '#1e2747', '#3a4a7a', '#232a46', '#2f5e7a', '#1f4a6a', '#122c4c', 1],
-  [4.6, '#1e2747', '#3a4a7a', '#232a46', '#2f5e7a', '#1f4a6a', '#122c4c', 1],
+  [0, '#2b3866', '#4f5f94', '#2e3658', '#3f7f98', '#2c6488', '#1a4470', 1],
+  [4.6, '#2b3866', '#4f5f94', '#2e3658', '#3f7f98', '#2c6488', '#1a4470', 1],
   [5.6, '#5a3e52', '#5a4f78', '#3a3049', '#6aa6b6', '#3f86a6', '#2a6488', 0.65],
-  [6.6, '#9a6a4e', '#8a7d92', '#5e5056', '#8fd8cf', '#47bcc4', '#2a96b2', 0.15],
+  [6.6, '#93725c', '#8a8496', '#605a5a', '#8fd8cf', '#47bcc4', '#2a96b2', 0.15],
   [8, '#807462', '#8c949f', '#6b665e', '#8ff0dc', '#3ad1cf', '#20b2c6', 0],
   [12, '#807870', '#8c939f', '#6b6660', '#8ff0dc', '#3ad1cf', '#20b2c6', 0],
   [16.5, '#86735c', '#8e9098', '#6d6559', '#8eecd6', '#3dcbc9', '#22aac0', 0],
-  [18, '#a26a48', '#8a7489', '#664f4f', '#9ee0c8', '#4ab8bf', '#2a92ae', 0.1],
-  [19, '#6a3e52', '#5c4c7a', '#3d3048', '#7ab0bc', '#3f86a6', '#2a6488', 0.55],
-  [20, '#232b4c', '#3c4a7a', '#252b46', '#3a6a84', '#24557a', '#153456', 0.95],
-  [24, '#1e2747', '#3a4a7a', '#232a46', '#2f5e7a', '#1f4a6a', '#122c4c', 1],
+  [18, '#977058', '#887a8e', '#655856', '#9ee0c8', '#4ab8bf', '#2a92ae', 0.1],
+  [19, '#5e4a66', '#5c5884', '#3f3a52', '#7ab0bc', '#3f86a6', '#2a6488', 0.55],
+  [20, '#2e3a68', '#4f5e92', '#2f3658', '#46829a', '#2e668a', '#1b4572', 0.95],
+  [24, '#2b3866', '#4f5f94', '#2e3658', '#3f7f98', '#2c6488', '#1a4470', 1],
 ].map(([h, ...rest]) => [h, ...rest.slice(0, 6).map((c) => new THREE.Color(c)), rest[6]]);
 
 const tmp = Array.from({ length: 6 }, () => new THREE.Color());
@@ -41,8 +41,11 @@ export class DayNight {
     this.night = night;
     // rain: greyer light, less sun
     const r = this.rain;
-    tmp[0].multiplyScalar(1 - 0.45 * r);
-    tmp[1].lerp(grey, r * 0.35 * (1 - night));
+    tmp[0].multiplyScalar(1 - 0.55 * r);
+    tmp[1].lerp(grey, r * 0.5 * (1 - night));
+    tmp[2].lerp(grey, r * 0.25 * (1 - night));
+    tmp[4].lerp(grey, r * 0.25);
+    tmp[5].lerp(grey, r * 0.2);
     U.uSunColor.value.copy(tmp[0]);
     U.uSkyColor.value.copy(tmp[1]);
     U.uGroundColor.value.copy(tmp[2]);

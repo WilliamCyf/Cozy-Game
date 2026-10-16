@@ -36,6 +36,8 @@ export class PlayerManager {
     L.y = ctx.world.walk.groundY(L.x, L.z);
     this.remotes = new Map();
     this._v = new THREE.Vector3();
+    this.list = []; // everyone on the island, refreshed once per frame (reused, no garbage)
+    this.pool = [];
   }
 
   setLocalLook(look) { this.local.char.setLook(look); }
@@ -124,11 +126,14 @@ export class PlayerManager {
     } else L.idleT += dt;
 
     rig.update(dt, L.x, L.y, L.z, L.vx, L.vz);
-    const anim = c.anim === 'idle' && speed > 0.25 ? 'walk' : c.anim;
-    this.ctx.session.setMyPos([
-      +L.x.toFixed(2), +L.z.toFixed(2), +L.heading.toFixed(2), ANIM_IDX[anim] ?? 0,
-      L.fishState, +L.bx.toFixed(2), +L.bz.toFixed(2), (L.sitting ? 1 : 0) | (L.wading ? 2 : 0),
-    ]);
+    L.anim = c.anim === 'idle' && speed > 0.25 ? 'walk' : c.anim;
+  }
+
+  // The little position message sent ~10x a second (built only when it's actually sent)
+  packet() {
+    const L = this.local;
+    const r2 = (v) => Math.round(v * 100) / 100;
+    return [r2(L.x), r2(L.z), r2(L.heading), ANIM_IDX[L.anim] ?? 0, L.fishState, r2(L.bx), r2(L.bz), (L.sitting ? 1 : 0) | (L.wading ? 2 : 0)];
   }
 
   // Remote players: create/remove characters to match who's online, and glide them along.
@@ -213,13 +218,22 @@ export class PlayerManager {
   update(dt, now) {
     this.updateLocal(dt);
     this.updateRemotes(dt, now);
+    // refresh the shared "everyone" list in place
+    const list = this.list;
+    let n = 0;
+    const put = (pid, src, char, local) => {
+      const e = this.pool[n] || (this.pool[n] = {});
+      e.pid = pid; e.char = char; e.x = src.x; e.y = src.y; e.z = src.z;
+      e.fishState = src.fishState; e.bx = src.bx; e.bz = src.bz; e.local = local;
+      list[n++] = e;
+    };
+    put(this.ctx.session.pid, this.local, this.local.char, true);
+    for (const [pid, r] of this.remotes) if (r.seen) put(pid, r, r.char, false);
+    list.length = n;
   }
 
   // Every character on the island (for shadows, fishing lines, nearby checks…)
-  *all() {
-    yield { pid: this.ctx.session.pid, char: this.local.char, x: this.local.x, y: this.local.y, z: this.local.z, fishState: this.local.fishState, bx: this.local.bx, bz: this.local.bz, local: true };
-    for (const [pid, r] of this.remotes) if (r.seen) yield { pid, char: r.char, x: r.x, y: r.y, z: r.z, fishState: r.fishState, bx: r.bx, bz: r.bz, local: false };
-  }
+  all() { return this.list; }
   charOf(pid) {
     if (pid === this.ctx.session.pid) return this.local.char;
     return this.remotes.get(pid)?.char || null;
