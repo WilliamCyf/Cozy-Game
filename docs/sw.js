@@ -1,7 +1,7 @@
 // Service worker: keeps a copy of the game on the phone so it opens instantly and works offline.
 // The page itself is checked online first (so updates arrive), everything else comes from the copy.
-const VERSION = '89b003a4e5';
-const FILES = ["./","./app.61414bb095.js","./fonts/fredoka-latin.woff2","./icons/icon-180.png","./icons/icon-192.png","./icons/icon-512.png","./icons/icon-maskable-512.png","./manifest.webmanifest","./splash/splash-1080x2340.jpg","./splash/splash-1125x2436.jpg","./splash/splash-1170x2532.jpg","./splash/splash-1179x2556.jpg","./splash/splash-1206x2622.jpg","./splash/splash-1242x2208.jpg","./splash/splash-1242x2688.jpg","./splash/splash-1284x2778.jpg","./splash/splash-1290x2796.jpg","./splash/splash-1320x2868.jpg","./splash/splash-750x1334.jpg","./splash/splash-828x1792.jpg"];
+const VERSION = 'c886713a96';
+const FILES = ["./","./app.a63edb733b.js","./fonts/fredoka-latin.woff2","./icons/icon-180.png","./icons/icon-192.png","./icons/icon-512.png","./icons/icon-maskable-512.png","./manifest.webmanifest","./splash/splash-1080x2340.jpg","./splash/splash-1125x2436.jpg","./splash/splash-1170x2532.jpg","./splash/splash-1179x2556.jpg","./splash/splash-1206x2622.jpg","./splash/splash-1242x2208.jpg","./splash/splash-1242x2688.jpg","./splash/splash-1284x2778.jpg","./splash/splash-1290x2796.jpg","./splash/splash-1320x2868.jpg","./splash/splash-750x1334.jpg","./splash/splash-828x1792.jpg"];
 const CACHE = 'cozycove-' + VERSION;
 
 self.addEventListener('install', (e) => {

@@ -277,6 +277,21 @@ export class UI {
     if (res?.isNew) g.fx.sparkle(g.players.local.x, g.players.local.y + 1, g.players.local.z, 16);
   }
 
+  // A cheerful card at the top that doesn't stop anyone from playing (fades by itself)
+  banner(emoji, title, name, text) {
+    this.bannerEl?.remove();
+    const el = h('div', { class: 'banner' }, h('span', { class: 'banner-ic' }, emoji), h('div', {}, h('small', {}, title), h('b', {}, name), h('p', {}, text)));
+    el.addEventListener('pointerdown', (e) => { e.stopPropagation(); el.classList.remove('in'); setTimeout(() => el.remove(), 400); });
+    this.root.appendChild(el);
+    this.bannerEl = el;
+    this.toastBox.classList.add('below-banner');
+    requestAnimationFrame(() => el.classList.add('in'));
+    setTimeout(() => {
+      el.classList.remove('in');
+      setTimeout(() => { el.remove(); if (this.bannerEl === el) this.toastBox.classList.remove('below-banner'); }, 400);
+    }, 6500);
+  }
+
   // full-screen message (connection lost etc.)
   showOverlay(html, buttons = []) {
     this.overlay.innerHTML = '';

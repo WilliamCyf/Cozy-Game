@@ -132,7 +132,7 @@ export function generateTerrain() {
       const rl2 = rdx * rdx + rdz * rdz;
       const rt = clamp(((x - RAMP.ax) * rdx + (z - RAMP.az) * rdz) / rl2, 0, 1);
       const rampDist = distToSegment(x, z, RAMP.ax, RAMP.az, RAMP.bx, RAMP.bz);
-      const rampMask = 1 - smoothstep(RAMP.width * 0.5, RAMP.width * 0.5 + 1.6, rampDist);
+      const rampMask = 1 - smoothstep(RAMP.width * 0.5, RAMP.width * 0.5 + 5.5, rampDist); // gentle grassy sides
       const rampRise = smoothstep(0, 1, rt);
       const rise = Math.max(cliff, rampRise * rampMask) ;
       // cliffs stay a few metres back from the sea (a beach at their feet),

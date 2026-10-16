@@ -136,8 +136,8 @@ export class Game {
     this.audio.fanfare();
     const P = this.players.local;
     for (let i = 0; i < 4; i++) setTimeout(() => { this.fx.burst(P.x + (Math.random() - 0.5) * 10, P.y + 7 + Math.random() * 3, P.z - 4, [[1, 0.5, 0.55], [1, 0.85, 0.4], [0.5, 0.8, 1]]); this.audio.boom(); }, i * 450);
-    this.ui.showOverlay(`<div class="celebrate"><div class="big-emoji">${p.emoji}</div><h2>Project complete!</h2><p><b>${p.name}</b></p><p>${p.reward}</p></div>`, [['Hooray! 🎉', () => this.ui.hideOverlay(), 'primary']]);
-    this.players.emote('cheer', 2.5);
+    this.ui.banner(p.emoji, 'Project complete!', p.name, p.reward);
+    if (!this.fishing.active) this.players.emote('cheer', 2.5);
   }
 
   highFive(r) {

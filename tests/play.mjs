@@ -172,6 +172,43 @@ try {
       await wait(2500);
       await shot(p, 'scene-' + n);
     }
+  } else if (scenario === 'visual2') {
+    const t = await newPhone('T');
+    await t.goto(base + '?nosw&nopeer&notry');
+    await wait(5000);
+    await t.getByText('Play on our island').click();
+    await wait(2500);
+    await shot(t, 'v-profile');
+    const p = await newPhone('A');
+    await p.goto(base + '?nosw&nopeer&notry&autostart=host&name=Mom&notut&debug');
+    await p.waitForFunction(() => window.__game, null, { timeout: 60000 });
+    await wait(1200);
+    const R = (req) => p.evaluate((r) => window.__game.session.request(r), req);
+    // fishing from the beach: should sit down
+    await p.evaluate(() => { const g = window.__game, L = g.players.local; L.x = -4; L.z = 37.5; L.heading = 0; g.rig.snap(); g.fishing.press(); setTimeout(() => g.fishing.release(), 500); });
+    await wait(3500);
+    await shot(p, 'v-beachfish');
+    await p.evaluate(() => window.__game.fishing.stop());
+    // repaired bridge + islet treasure mark
+    await R({ a: 'cheat', project: 'bridge' }); await R({ a: 'cheat', project: 'path' });
+    await p.evaluate(() => { const g = window.__game, L = g.players.local; L.x = 58; L.z = 17; g.rig.snap(); });
+    await wait(2500);
+    await shot(p, 'v-islet');
+    await p.evaluate(() => { const g = window.__game, L = g.players.local; L.x = 9; L.z = -12; g.rig.snap(); });
+    await wait(2500);
+    await shot(p, 'v-ramp');
+    // cooking through the real buttons
+    await R({ a: 'cheat', item: 'fish:sardine', n: 2 });
+    await p.evaluate(() => { const g = window.__game, L = g.players.local; L.x = -7; L.z = -0.4; L.heading = Math.PI; g.rig.snap(); });
+    await wait(1200);
+    await p.evaluate(() => window.__game.openPanel('cook'));
+    await wait(700);
+    const bb = await p.locator('.recipe .btn').first().boundingBox();
+    await p.mouse.click(bb.x + bb.width / 2, bb.y + bb.height / 2);
+    await wait(1500);
+    await shot(p, 'v-cooking');
+    await p.waitForFunction(() => (window.__game.session.state.basket.grilled || 0) > 0, null, { timeout: 30000 });
+    console.log('cooked via UI: grilled =', await p.evaluate(() => window.__game.session.state.basket.grilled));
   } else if (scenario === 'landscape') {
     const t = await newPhone('T', true);
     await t.goto(base + '?nosw&nopeer&notry');

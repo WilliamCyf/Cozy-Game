@@ -1,6 +1,7 @@
 // The walking map: a grid that says, for every half-metre square, whether you can walk there.
 //   0 = blocked (deep water, cliffs, walls)  1 = ground  2 = shallow water  3 = wooden floor
 import * as L from './layout.js';
+import { distToSegment } from '../util/math.js';
 
 const PLAYER_R = 0.32; // how "wide" a person is
 export const FLAG = { BLOCKED: 0, GROUND: 1, SHALLOW: 2, WOOD: 3 };
@@ -34,7 +35,10 @@ export function buildWalkGrid(terrain, ctx) {
     const depth = waterLevelAt(x, z, h) - h;
     const dx = (H[k + 1] - H[k - 1]) / (2 * CELL), dz = (H[k + N] - H[k - N]) / (2 * CELL);
     const slope = Math.hypot(dx, dz);
-    if (depth > 0.32 || slope > 0.85) flags[k] = 0;
+    // the forest ramp: you walk up on the dirt path, not up its grassy sides
+    const rampD = distToSegment(x, z, L.RAMP.ax, L.RAMP.az, L.RAMP.bx, L.RAMP.bz);
+    const rampSide = rampD > L.RAMP.width * 0.5 + 0.4 && rampD < L.RAMP.width * 0.5 + 7 && h > 1.15 && h < 4.3;
+    if (depth > 0.32 || slope > 0.85 || rampSide) flags[k] = 0;
     else if (depth > -0.03) flags[k] = 2;
     else flags[k] = 1;
     surfY[k] = 0;
