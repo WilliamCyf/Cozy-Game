@@ -377,8 +377,14 @@ export function makeGlowMaterial(map) {
         }
         vI = vis * aData.w;
         vec4 mv = viewMatrix * modelMatrix * vec4(p, 1.0);
-        gl_Position = projectionMatrix * mv;
         gl_PointSize = aData.x * vis * uPointScale / -mv.z;
+        // lantern glows: slide the sprite a little towards the camera (same size on screen)
+        // so it never dips into the ground, which would cut a hard straight edge into it
+        if (k > 1.5 || k < 0.5) {
+          float len = length(mv.xyz);
+          mv.xyz *= 1.0 - min(aData.x * vis * 0.5 + 1.5, len * 0.5) / len;
+        }
+        gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
       uniform sampler2D uMap;
@@ -392,5 +398,45 @@ export function makeGlowMaterial(map) {
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
+  });
+}
+
+// ---------- Butterflies: animated completely on the graphics chip (no work for the CPU) ----------
+export function makeButterflyMaterial(map) {
+  return new THREE.ShaderMaterial({
+    uniforms: { uTime: U.uTime, uNight: U.uNight, uRain: U.uRain, uPointScale: U.uPointScale, uMap: { value: map } },
+    vertexShader: /* glsl */ `
+      uniform float uTime, uNight, uRain, uPointScale;
+      attribute vec4 aB; // x phase, y wander radius, z colour, w size
+      varying vec3 vC;
+      varying float vA, vFlap;
+      void main() {
+        vec3 p = position;
+        float t = uTime * 0.3 + aB.x * 10.0;
+        p.x += sin(t) * aB.y + sin(t * 2.3) * 0.5;
+        p.z += cos(t * 0.8) * aB.y + cos(t * 1.7) * 0.4;
+        p.y += 0.5 + sin(uTime * 2.2 + aB.x * 7.0) * 0.3;
+        vFlap = 0.25 + 0.75 * abs(sin(uTime * 11.0 + aB.x * 20.0));
+        vA = (1.0 - smoothstep(0.25, 0.55, uNight)) * (1.0 - uRain);
+        float c = aB.z;
+        vC = c < 0.25 ? vec3(1.0, 0.75, 0.85) : c < 0.5 ? vec3(1.0, 0.93, 0.55) : c < 0.75 ? vec3(0.7, 0.85, 1.0) : vec3(1.0, 1.0, 1.0);
+        vec4 mv = viewMatrix * modelMatrix * vec4(p, 1.0);
+        gl_Position = projectionMatrix * mv;
+        gl_PointSize = vA > 0.01 ? aB.w * uPointScale / -mv.z : 0.0;
+      }`,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D uMap;
+      varying vec3 vC;
+      varying float vA, vFlap;
+      void main() {
+        // squeeze the picture sideways = wings folding
+        float u = 0.5 + (gl_PointCoord.x - 0.5) / vFlap;
+        if (u < 0.0 || u > 1.0) discard;
+        float a = texture2D(uMap, vec2(u * 0.25, 1.0 - (2.0 + gl_PointCoord.y) * 0.25)).a * vA;
+        if (a < 0.05) discard;
+        gl_FragColor = vec4(vC * (0.85 + 0.15 * vFlap), a);
+      }`,
+    transparent: true,
+    depthWrite: false,
   });
 }

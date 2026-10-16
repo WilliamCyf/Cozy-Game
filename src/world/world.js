@@ -6,7 +6,7 @@ import * as P from './props.js';
 import { ChunkedBuilder, MeshBuilder, M, box, hex } from '../render/geo.js';
 import { makeMaskTexture, makeNoiseTexture, makeCausticTexture, makeParticleAtlas } from '../render/textures.js';
 import {
-  U, makePropMaterial, makeOutlineMaterial, makeTerrainMaterial, makeWaterMaterial, makeWaterfallMaterial, makeGlowMaterial,
+  U, makePropMaterial, makeOutlineMaterial, makeTerrainMaterial, makeWaterMaterial, makeWaterfallMaterial, makeGlowMaterial, makeButterflyMaterial,
 } from '../render/materials.js';
 import { buildWalkGrid } from './walk.js';
 import { smoothstep, mulberry32, distToPolyline, distToSegment } from '../util/math.js';
@@ -195,6 +195,7 @@ export async function buildWorld(scene, onProgress = () => {}) {
   P.cliffRocks(ctx, lipX);
   P.coastRocks(ctx, { x: L.LIGHTHOUSE_POINT.x, z: L.LIGHTHOUSE_POINT.z, rx: L.LIGHTHOUSE_POINT.rx * 0.8, rz: L.LIGHTHOUSE_POINT.rz * 0.8 }, 61);
   P.pondDecor(ctx);
+  P.beachDecor(ctx);
   P.coralAndSeaweed(ctx);
 
   onProgress(0.45, 'Sprinkling flowers…');
@@ -311,6 +312,25 @@ export async function buildWorld(scene, onProgress = () => {}) {
   glows.frustumCulled = false;
   glows.renderOrder = 30;
   root.add(glows);
+
+  // butterflies over the meadows (day only)
+  const bPts = [], bData = [];
+  for (let i = 0; i < 28; i++) {
+    let x = 0, z = 0;
+    for (let t = 0; t < 30; t++) {
+      x = -50 + rr() * 95; z = -40 + rr() * 60;
+      if (terrain.sampleGrid(terrain.grass, x, z) > 0.9 && terrain.heightAt(x, z) < 2.5) break;
+    }
+    bPts.push(x, terrain.heightAt(x, z), z);
+    bData.push(rr(), 1.5 + rr() * 2.5, rr(), 0.55 + rr() * 0.25);
+  }
+  const bGeo = new THREE.BufferGeometry();
+  bGeo.setAttribute('position', new THREE.Float32BufferAttribute(bPts, 3));
+  bGeo.setAttribute('aB', new THREE.Float32BufferAttribute(bData, 4));
+  const butterflies = new THREE.Points(bGeo, makeButterflyMaterial(atlas));
+  butterflies.frustumCulled = false;
+  butterflies.renderOrder = 29;
+  root.add(butterflies);
 
   onProgress(0.88, 'Drawing the footpaths…');
   await nextFrame();

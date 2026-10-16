@@ -270,6 +270,16 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 .heart { margin-right: 8px; font-weight: 700; }
 .shop-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; color: var(--ink2); margin-bottom: 10px; font-style: italic; }
 .shop-top b { font-style: normal; font-size: 17px; color: var(--ink); white-space: nowrap; }
+.grid.stickers { grid-template-columns: repeat(4, 1fr); }
+.sticker { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; border-radius: 16px; background: var(--cream2); border: 3px dashed var(--line); }
+.sticker.got { background: #fffbe8; border: 3px solid var(--orange); }
+.sticker-ic { font-size: 30px; }
+.sticker small { font-size: 10px; text-align: center; line-height: 1.15; color: var(--ink2); }
+.request { display: flex; align-items: center; gap: 10px; background: #fff4dc; border: 3px solid var(--orange); border-radius: 16px; padding: 8px 10px; margin-bottom: 10px; }
+.request.done { background: #eef9e6; border-color: #b9dea2; }
+.request .grow { flex: 1; display: flex; flex-direction: column; }
+.request small { color: var(--ink2); font-size: 12px; }
+.island-name { font-weight: 700; font-size: 18px; margin-bottom: 4px; }
 .letter { background: #fffef8; border: 3px dashed var(--line2); border-radius: 16px; padding: 14px 16px; font-size: 17px; line-height: 1.4; }
 .letter .from { text-align: right; font-style: italic; color: var(--ink2); }
 .letter .gift { font-size: 20px; text-align: center; margin-top: 6px; }

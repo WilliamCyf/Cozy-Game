@@ -1,7 +1,8 @@
 // The host's rule book. Only the host phone runs this.
 // Players send requests ("I'd like to sell 3 shells"); the host checks the ledger,
 // and if it's allowed, writes the ops (journal entries) that everyone applies.
-import { CROPS, ITEMS, FISH_BY_ID, RECIPES, SHOP, PROJECTS, PROJECT_BY_ID, LETTERS, BOTTLE_NOTES, JOURNAL_FISH, RARITY } from './data.js';
+import { CROPS, ITEMS, FISH_BY_ID, RECIPES, SHOP, PROJECTS, PROJECT_BY_ID, LETTERS, BOTTLE_NOTES, JOURNAL_FISH, RARITY, REQUESTS, STICKERS } from './data.js';
+import { PICNIC } from '../world/layout.js';
 import { SPAWN_RULES, DIG_SPOT } from './spawns.js';
 import { HATS } from '../entities/character.js';
 import { mulberry32, weightedPick } from '../util/math.js';
@@ -22,6 +23,7 @@ export class HostLogic {
     this.slow = 0;
     this.lastHour = Math.floor(this.s.time);
     this.rand = mulberry32((Date.now() & 0xffff) + 7);
+    if (!this.s.request || this.s.request.day !== this.s.day) this.newRequest();
     // fill the beaches a bit on a brand-new island
     if (Object.keys(this.s.items).length === 0) {
       for (const cat of Object.keys(SPAWN_RULES)) for (let i = 0; i < Math.ceil(SPAWN_RULES[cat].max * 0.6); i++) this.spawn(cat);
@@ -58,7 +60,7 @@ export class HostLogic {
       p.grow = (p.grow || 0) + step;
       if (p.grow >= CROPS[p.crop].stage) {
         this.ops([['set', ['plots', i], { ...p, stage: p.stage + 1, grow: 0, water: raining }]]);
-        if (p.stage === 3) this.fx({ kind: 'sparkle', x: this.world.plots[i].x, z: this.world.plots[i].z });
+        if (p.stage + 1 === 3) this.fx({ kind: 'sparkle', x: this.world.plots[i].x, z: this.world.plots[i].z });
       }
     });
     // fruit regrows on bushes, coconuts on palms
@@ -76,6 +78,9 @@ export class HostLogic {
         this.spawn(cat);
       }
     }
+    // how many family members at once (for the Full House sticker)
+    const online = this.session.online.size;
+    if (online > (s.stats.maxOnline || 1)) { this.ops([['set', ['stats', 'maxOnline'], online]]); this.checkStickers(); }
     if (raining && s.clock > s.weatherUntil) {
       this.ops([['set', ['weather'], 'sun']]);
       this.feed('🌈 The rain stopped. Look, a rainbow!');
@@ -97,6 +102,72 @@ export class HostLogic {
   newDay() {
     this.ops([['inc', ['day'], 1], ['inc', ['stats', 'days'], 1]]);
     this.feed(`🌅 Good morning! Day ${this.s.day} on the island.`);
+    this.newRequest();
+    this.feed('🐢 Captain Shelly has a new request at the shop!');
+  }
+
+  newRequest() {
+    const s = this.s;
+    const ok = REQUESTS.filter((r) => !r.needs || s.projects[r.needs]?.done);
+    const prev = s.request?.item;
+    let r = ok[Math.floor(Math.random() * ok.length)];
+    if (r.item === prev && ok.length > 1) r = ok[(ok.indexOf(r) + 1) % ok.length];
+    this.ops([['set', ['request'], { day: s.day, item: r.item, n: r.n, reward: r.reward, bonus: r.bonus || null, done: false }]]);
+  }
+
+  // which basket items count for a need like "anyFish" (cheapest first)
+  matching(need) {
+    const b = this.s.basket;
+    let ids;
+    if (need === 'anyFish') ids = Object.keys(b).filter((id) => ITEMS[id]?.kind === 'fish');
+    else if (need === 'anyDish') ids = RECIPES.filter((r) => !r.special).map((r) => r.id);
+    else if (need === 'anyCrop') ids = Object.keys(CROPS);
+    else ids = [need];
+    return ids.filter((id) => (b[id] || 0) > 0).sort((a, c) => (ITEMS[a]?.value || 0) - (ITEMS[c]?.value || 0));
+  }
+
+  a_request(pid) {
+    const r = this.s.request;
+    if (!r || r.done) return { ok: false, msg: 'Captain Shelly has everything she needs today. Come back tomorrow!' };
+    const ids = this.matching(r.item);
+    const have = ids.reduce((a, id) => a + this.s.basket[id], 0);
+    if (have < r.n) return { ok: false, msg: `You need ${r.n - have} more first.` };
+    const ops = [];
+    let left = r.n;
+    for (const id of ids) {
+      const take = Math.min(left, this.s.basket[id]);
+      if (take > 0) { ops.push(this.give(id, -take)); left -= take; }
+      if (!left) break;
+    }
+    ops.push(['inc', ['coins'], r.reward], ['inc', ['stats', 'earned'], r.reward], ['inc', ['stats', 'requests'], 1], ['set', ['request', 'done'], true]);
+    if (r.bonus) ops.push(this.give(r.bonus, 1));
+    this.ops(ops);
+    this.feed(`🐢 ${this.playerName(pid)} helped Captain Shelly! +${r.reward} coins for the family jar.`);
+    return { ok: true, reward: r.reward, bonus: r.bonus };
+  }
+
+  a_rename(pid, req) {
+    if (pid !== this.session.pid) return { ok: false, msg: 'Only the host can rename the island.' };
+    const name = String(req.name || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    if (!name) return { ok: false };
+    this.ops([['set', ['name'], name]]);
+    this.feed(`🏝️ The island is now called “${name}”!`);
+    return { ok: true };
+  }
+
+  // award any newly earned stickers
+  checkStickers() {
+    const s = this.s;
+    const have = new Set(s.stickers || []);
+    for (const st of STICKERS) {
+      if (have.has(st.id)) continue;
+      let ok = false;
+      try { ok = !!st.test(s, FISH_BY_ID); } catch { ok = false; }
+      if (ok) {
+        this.ops([['push', ['stickers'], st.id, 100]]);
+        this.feed(`🏅 New sticker for the family: ${st.emoji} ${st.name}!`);
+      }
+    }
   }
 
   spawn(cat) {
@@ -123,7 +194,9 @@ export class HostLogic {
     const fn = this['a_' + req.a];
     if (!fn) return { ok: false, msg: 'Unknown action' };
     try {
-      return fn.call(this, pid, req) || { ok: true };
+      const res = fn.call(this, pid, req) || { ok: true };
+      if (req.a !== 'emote' && req.a !== 'hello') this.checkStickers();
+      return res;
     } catch (e) {
       console.warn('action failed', req, e);
       return { ok: false, msg: 'Oops, something went wrong.' };
@@ -227,7 +300,7 @@ export class HostLogic {
     }
     if (req.extra === 'bottle') {
       const note = BOTTLE_NOTES[Math.floor(Math.random() * BOTTLE_NOTES.length)];
-      this.ops([...ops, ['inc', ['coins'], 5], ['inc', ['stats', 'earned'], 5]]);
+      this.ops([...ops, ['inc', ['coins'], 5], ['inc', ['stats', 'earned'], 5], ['inc', ['stats', 'bottles'], 1]]);
       return { ok: true, note };
     }
     if (req.extra === 'chest') {
@@ -322,7 +395,7 @@ export class HostLogic {
     const ops = Object.entries(use).map(([k, n]) => this.give(k, -n));
     ops.push(this.give(r.id, 1), ['inc', ['stats', 'dishes'], 1]);
     this.ops(ops);
-    if (r.special) this.feed(`🍱 ${this.playerName(pid)} cooked a Family Feast! Everyone gather round!`);
+    if (r.special) { this.ops([['inc', ['stats', 'feasts'], 1]]); this.feed(`🍱 ${this.playerName(pid)} cooked a Family Feast! Everyone gather round!`); }
     this.fx({ kind: 'cook', pid, r: r.id });
     return { ok: true };
   }
@@ -409,7 +482,7 @@ export class HostLogic {
     if (s.treasure.day >= s.day) return { ok: false, msg: 'Already dug up today’s treasure. More tomorrow!' };
     const coins = randInt(60, 140);
     const bonus = ['seaglass', 'coral', 'lure', 'seed:pumpkin'][Math.floor(Math.random() * 4)];
-    this.ops([['set', ['treasure', 'day'], s.day], ['inc', ['coins'], coins], ['inc', ['stats', 'earned'], coins], this.give(bonus, 1)]);
+    this.ops([['set', ['treasure', 'day'], s.day], ['inc', ['coins'], coins], ['inc', ['stats', 'earned'], coins], ['inc', ['stats', 'treasures'], 1], this.give(bonus, 1)]);
     this.feed(`🏴‍☠️ ${this.playerName(pid)} dug up buried treasure: ${coins} coins and a ${ITEMS[bonus].name}!`);
     this.fx({ kind: 'pop', x: DIG_SPOT.x, z: DIG_SPOT.z, item: 'chest', pid });
     void req;
@@ -420,9 +493,29 @@ export class HostLogic {
     const allowed = ['wave', 'heart', 'dance', 'cheer', 'sit', 'laugh', 'sleep'];
     if (!allowed.includes(req.e)) return { ok: false };
     this.fx({ kind: 'emote', pid, e: req.e });
+    if (req.e === 'sit') setTimeout(() => this.checkPicnic(pid), 600);
+  }
+
+  // Family picnic: 2+ people sitting together at the picnic spot (once a day)
+  checkPicnic(pid) {
+    const s = this.s;
+    if (!s.projects.picnic?.done || (s.picnicDay || 0) >= s.day) return;
+    const cx = PICNIC.x + 2, cz = PICNIC.z;
+    let n = 0;
+    for (const [, o] of this.session.online) {
+      const p = o.s;
+      if (p && Math.hypot(p[0] - cx, p[1] - cz) < 6 && p[3] === 2) n++; // 2 = sitting animation
+    }
+    if (n < 2) return;
+    this.ops([['set', ['picnicDay'], s.day], ['inc', ['coins'], 30], ['inc', ['stats', 'picnics'], 1], ['inc', ['stats', 'earned'], 30]]);
+    this.feed(`🧺 Family picnic! ${n} of you sat together. Everyone feels cozy. +30 coins`);
+    this.fx({ kind: 'picnic', pid });
+    this.checkStickers();
+    this.session.flush();
   }
 
   a_pet(pid, req) {
+    this.ops([['inc', ['stats', 'pets'], 1]]);
     this.fx({ kind: 'pet', pid, who: req.who || 'cat' });
   }
 

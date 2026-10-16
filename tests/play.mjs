@@ -104,8 +104,10 @@ try {
     // 4) garden: plant -> water -> grow -> harvest
     r = await R({ a: 'plant', i: 0, crop: 'carrot' }); log(`plant: ${r.ok}`);
     r = await R({ a: 'water', i: 0 }); log(`water: ${r.ok}`);
-    for (let st = 0; st < 3; st++) {
-      await p.evaluate(() => { const pl = window.__game.session.state.plots[0]; pl.grow = 999; pl.water = true; });
+    // speed up growing (the game clock runs slowly in the test browser, so wait until it is ripe)
+    for (let st = 0; st < 12; st++) {
+      const stage = await p.evaluate(() => { const pl = window.__game.session.state.plots[0]; if (pl.stage < 3) { pl.grow = 999; pl.water = true; } return pl.stage; });
+      if (stage >= 3) break;
       await wait(1600);
     }
     s = await S(); log(`plot after growing: ${JSON.stringify(s.plots[0])}`);
@@ -209,6 +211,44 @@ try {
     await shot(p, 'v-cooking');
     await p.waitForFunction(() => (window.__game.session.state.basket.grilled || 0) > 0, null, { timeout: 30000 });
     console.log('cooked via UI: grilled =', await p.evaluate(() => window.__game.session.state.basket.grilled));
+  } else if (scenario === 'features') {
+    const p = await newPhone('A');
+    await p.goto(base + '?nosw&nopeer&notry&autostart=host&name=Mom&notut&debug');
+    await p.waitForFunction(() => window.__game, null, { timeout: 60000 });
+    await wait(1000);
+    const R = (req) => p.evaluate((r) => window.__game.session.request(r), req);
+    const S = () => p.evaluate(() => JSON.parse(JSON.stringify(window.__game.session.state)));
+    let s = await S();
+    console.log('request of the day:', JSON.stringify(s.request));
+    let r = await R({ a: 'request' }); console.log('give without items (should fail):', JSON.stringify(r));
+    const need = s.request.item === 'anyFish' ? 'fish:sardine' : s.request.item === 'anyDish' ? 'grilled' : s.request.item;
+    await R({ a: 'cheat', item: need, n: s.request.n });
+    r = await R({ a: 'request' }); console.log('give with items:', JSON.stringify(r));
+    r = await R({ a: 'request' }); console.log('give again (should be done):', r.ok);
+    // stickers: catch a fish -> First Catch
+    await R({ a: 'catch', fish: 'sardine', size: 12 });
+    s = await S(); console.log('stickers after first catch:', JSON.stringify(s.stickers));
+    await R({ a: 'cheat', project: 'bridge' });
+    s = await S(); console.log('stickers after bridge:', JSON.stringify(s.stickers));
+    r = await R({ a: 'rename', name: '  The   Smiths\u2019 Cove  ' }); s = await S(); console.log('rename:', r.ok, JSON.stringify(s.name));
+    await p.evaluate(() => window.__game.openPanel('journal', 'stickers'));
+    await wait(800);
+    await shot(p, 'stickers');
+    await p.evaluate(() => window.__game.ui.closeSheet());
+    await p.evaluate(() => window.__game.openPanel('shop'));
+    await wait(800);
+    await shot(p, 'shop-request');
+    await p.evaluate(() => window.__game.ui.closeSheet());
+    await p.evaluate(() => window.__game.openPanel('family'));
+    await wait(800);
+    await shot(p, 'family-name');
+    // a new day brings a new request
+    await p.evaluate(() => { window.__game.session.state.time = 5.98; });
+    await wait(4000);
+    s = await S(); console.log('day', s.day, 'new request:', JSON.stringify(s.request));
+    await p.evaluate(() => window.__game.openPanel('shop'));
+    await wait(800);
+    await shot(p, 'shop-request2');
   } else if (scenario === 'landscape') {
     const t = await newPhone('T', true);
     await t.goto(base + '?nosw&nopeer&notry');

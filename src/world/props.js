@@ -760,6 +760,58 @@ function distToSegLocal(px, pz, ax, az, bx, bz) {
   return Math.hypot(ax + dx * t - px, az + dz * t - pz);
 }
 
+// One coloured slice of a beach umbrella (visible from above and below)
+function canopySlice(r, h, a0, a1) {
+  const top = [0, h, 0], p0 = [Math.cos(a0) * r, 0, Math.sin(a0) * r], p1 = [Math.cos(a1) * r, 0, Math.sin(a1) * r];
+  const ux = p1[0] - top[0], uy = p1[1] - top[1], uz = p1[2] - top[2];
+  const vx = p0[0] - top[0], vy = p0[1] - top[1], vz = p0[2] - top[2];
+  let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+  const l = Math.hypot(nx, ny, nz) || 1;
+  nx /= l; ny /= l; nz /= l;
+  if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
+  const pos = new Float32Array([...top, ...p1, ...p0, ...top, ...p0, ...p1]);
+  const nor = new Float32Array([nx, ny, nz, nx, ny, nz, nx, ny, nz, -nx, -ny, -nz, -nx, -ny, -nz, -nx, -ny, -nz]);
+  return { pos, nor, sn: nor.slice() };
+}
+
+// Beach umbrella, towels and sandcastles
+export function beachDecor(ctx) {
+  const umbrella = (x, z, rot, cols) => {
+    const by = ground(ctx, x, z);
+    const B = ctx.B.at(x, z);
+    B.add(cylinder(0.05, 0.05, 2.4, 6), M(x, by, z, 0, 0.12), C.white, { recv: 1 });
+    for (let i = 0; i < 8; i++) {
+      const a0 = (i / 8) * TAU + rot, a1 = ((i + 1) / 8) * TAU + rot;
+      B.add(canopySlice(1.55, 0.55, a0, a1), M(x + 0.29, by + 2.25, z), cols[i % 2], { recv: 0, sway: 0.08 });
+    }
+    ctx.shadows.push({ t: 'c', x: x + shiftX(2.3) + 0.3, z: z + shiftZ(2.3), r: 1.5, a: 0.85 });
+  };
+  const towel = (x, z, rot, a, b) => {
+    const by = ground(ctx, x, z);
+    const B = ctx.B.at(x, z);
+    for (let k = 0; k < 5; k++) B.add(box(0.95, 0.03, 0.36), M(x + Math.sin(rot) * (k - 2) * 0.36, by + 0.02, z + Math.cos(rot) * (k - 2) * 0.36, rot), k % 2 ? a : b, { recv: 1, outline: false });
+  };
+  const castle = (x, z) => {
+    const by = ground(ctx, x, z);
+    const B = ctx.B.at(x, z);
+    const sand = hex('#e8d29c');
+    B.add(cylinder(0.5, 0.6, 0.45, 8), M(x, by - 0.02, z), sand, { recv: 1 });
+    for (const [dx, dz] of [[-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45]]) B.add(cylinder(0.2, 0.24, 0.65, 6), M(x + dx, by, z + dz), sand, { recv: 1 });
+    B.add(cylinder(0.28, 0.32, 0.4, 8), M(x, by + 0.43, z), sand, { recv: 1 });
+    B.add(box(0.02, 0.35, 0.02), M(x, by + 1.0, z), C.woodD, { recv: 1, outline: false });
+    B.add(prism(0.25, 0.18, 0.02), M(x + 0.12, by + 1.1, z, 0, 0, -Math.PI / 2), C.red, { recv: 0, outline: false, sway: 0.4 });
+    ctx.colliders.push({ t: 'c', x, z, r: 0.75 });
+  };
+  umbrella(-56.5, 8, 0.3, [C.red, C.white]);
+  towel(-54.9, 9.6, 0.5, hex('#5d8fd8'), C.white);
+  towel(-57.9, 10.4, -0.4, hex('#f5cf4a'), hex('#e8574a'));
+  ctx.colliders.push({ t: 'c', x: -56.5, z: 8, r: 0.3 });
+  umbrella(59.5, 21.5, 1.1, [hex('#3fb5a8'), C.white]);
+  castle(-53, 15);
+  castle(64.5, 11.5);
+  castle(-9, 32.3);
+}
+
 export function pondDecor(ctx) {
   const r = mulberry32(404);
   // lily pads

@@ -1,6 +1,6 @@
 // What's inside each pop-up panel (basket, journal, family board, shop, cooking…).
 import { h, tapButton } from './dom.js';
-import { ITEMS, FISH, FISH_BY_ID, JOURNAL_FISH, RARITY, CROPS, RECIPES, SHOP, PROJECTS, PROJECT_BY_ID } from '../game/data.js';
+import { ITEMS, FISH, FISH_BY_ID, JOURNAL_FISH, RARITY, CROPS, RECIPES, SHOP, PROJECTS, PROJECT_BY_ID, STICKERS } from '../game/data.js';
 import { HATS } from '../entities/character.js';
 import { buildLookEditor, hatEmoji } from './lookeditor.js';
 import { fishSVG } from './fishart.js';
@@ -10,7 +10,19 @@ const HAB_ICON = { shore: '🏖️ Beach', deep: '🌊 Deep sea', pond: '🌲 Fo
 const TIME_ICON = { any: '', day: '☀️ Daytime', night: '🌙 Night', dawn: '🌅 Dawn', dusk: '🌇 Sunset', rain: '🌧️ Rain or night' };
 const NEED_LABEL = { coins: ['🪙', 'Coins'], anyCrop: ['🥕', 'Any crops'], anyDish: ['🍲', 'Any cooked dishes'], journal: ['📖', 'Kinds of fish discovered'], feast: ['🍱', 'Family Feast'] };
 
+const REQ_LABEL = { anyFish: ['🐟', 'Any fish'], anyDish: ['🍲', 'Any cooked dish'], anyCrop: ['🥕', 'Any veggies'] };
+
 const count = (g, id) => g.session.state.basket[id] || 0;
+// how many basket items count towards Shelly's request (same rule as the host uses)
+function requestHave(s, need) {
+  const b = s.basket;
+  let ids;
+  if (need === 'anyFish') ids = Object.keys(b).filter((id) => ITEMS[id]?.kind === 'fish');
+  else if (need === 'anyDish') ids = RECIPES.filter((r) => !r.special).map((r) => r.id);
+  else if (need === 'anyCrop') ids = Object.keys(CROPS);
+  else ids = [need];
+  return ids.reduce((a, id) => a + (b[id] || 0), 0);
+}
 const btn = (label, ontap, cls = '', disabled = false) => {
   const b = tapButton({ class: 'btn ' + cls, ontap }, label);
   if (disabled) b.disabled = true;
@@ -90,7 +102,18 @@ export function journalPanel(g, tab = 'fish') {
       const found = JOURNAL_FISH.filter((f) => s.journal[f.id]).length;
       b.append(h('div', { class: 'tabs' },
         tapButton({ class: 'tab' + (tab === 'fish' ? ' on' : ''), ontap: () => { close(); journalPanel(g, 'fish'); } }, '🐟 Fish'),
-        tapButton({ class: 'tab' + (tab === 'family' ? ' on' : ''), ontap: () => { close(); journalPanel(g, 'family'); } }, '🏅 Family')));
+        tapButton({ class: 'tab' + (tab === 'stickers' ? ' on' : ''), ontap: () => { close(); journalPanel(g, 'stickers'); } }, '🏅 Stickers'),
+        tapButton({ class: 'tab' + (tab === 'family' ? ' on' : ''), ontap: () => { close(); journalPanel(g, 'family'); } }, '📊 Family')));
+      if (tab === 'stickers') {
+        const got = new Set(s.stickers || []);
+        b.append(h('div', { class: 'progress' }, h('i', { style: { width: `${(got.size / STICKERS.length) * 100}%` } }), h('span', {}, `${got.size} of ${STICKERS.length} stickers`)));
+        b.append(h('div', { class: 'grid stickers' }, STICKERS.map((st) => {
+          const has = got.has(st.id);
+          return tapButton({ class: 'sticker' + (has ? ' got' : ''), ontap: () => g.ui.toast(has ? `${st.name}: ${st.hint}!` : `To earn it: ${st.hint}`, has ? st.emoji : '🔒', 2000) },
+            h('span', { class: 'sticker-ic' }, has ? st.emoji : '❔'), h('small', {}, has ? st.name : st.hint));
+        })));
+        return;
+      }
       if (tab === 'family') {
         const st = s.stats;
         b.append(h('div', { class: 'stats' },
@@ -189,6 +212,21 @@ export function shopPanel(g, tab = 'seeds') {
     build: (b, close) => {
       const s = g.session.state;
       b.append(h('div', { class: 'shop-top' }, h('span', {}, '"Ahoy, little islanders! What’ll it be?"'), h('b', {}, `🪙 ${s.coins}`)));
+      const rq = s.request;
+      if (rq) {
+        const [ric, rname] = REQ_LABEL[rq.item] || [ITEMS[rq.item]?.emoji || '🎁', ITEMS[rq.item]?.name || rq.item];
+        const have = requestHave(s, rq.item);
+        const bonus = rq.bonus ? ` + ${ITEMS[rq.bonus]?.emoji || '🎁'} ${ITEMS[rq.bonus]?.name || ''}` : '';
+        b.append(h('div', { class: 'request' + (rq.done ? ' done' : '') },
+          h('span', { class: 'big-ic' }, rq.done ? '💚' : ric),
+          h('div', { class: 'grow' },
+            h('b', {}, rq.done ? 'Thank you, family!' : `Today: ${rname} ×${rq.n}`),
+            h('small', {}, rq.done ? 'Shelly will have a new request tomorrow.' : `You have ${Math.min(have, rq.n)}/${rq.n} · reward 🪙 ${rq.reward}${bonus}`)),
+          rq.done ? null : btn('Give', async () => {
+            const r = await ask(g, { a: 'request' });
+            if (r?.ok) { g.audio.fanfare(); g.ui.toast(`Thank you! +${r.reward} coins`, '🐢', 2200); g.ui.refreshSheet(); }
+          }, 'small primary', have < rq.n)));
+      }
       b.append(h('div', { class: 'tabs' },
         tapButton({ class: 'tab' + (tab === 'seeds' ? ' on' : ''), ontap: () => { close(); shopPanel(g, 'seeds'); } }, '🌱 Seeds & Bait'),
         tapButton({ class: 'tab' + (tab === 'hats' ? ' on' : ''), ontap: () => { close(); shopPanel(g, 'hats'); } }, '🎩 Hats')));
@@ -313,7 +351,13 @@ export function familyPanel(g) {
       const S = g.session;
       const code = S.code || '';
       const pretty = code.replace(/(\d+)$/, ' $1');
-      b.append(h('div', { class: 'code-box' }, h('small', {}, S.isHost ? 'Our island code' : 'Island code'), h('div', { class: 'code' }, pretty)));
+      b.append(h('div', { class: 'code-box' }, h('div', { class: 'island-name' }, '🏝️ ', S.state.name || 'Cozy Cove'), h('small', {}, S.isHost ? 'Our island code' : 'Island code'), h('div', { class: 'code' }, pretty)));
+      if (S.isHost) {
+        b.append(h('div', { class: 'row' }, btn('✏️ Name our island', async () => {
+          const name = prompt('What should your island be called?', S.state.name || 'Cozy Cove');
+          if (name && name.trim()) { await ask(g, { a: 'rename', name }); g.ui.refreshSheet(); }
+        }, 'small ghost')));
+      }
       if (S.isHost) {
         const st = S.transport?.status() || {};
         b.append(h('p', { class: 'lead' }, 'On another phone: open Cozy Cove → ', h('b', {}, 'Join Family'), ' → type this code. Up to 4 players can play together. Being on the same Wi-Fi works best!'));

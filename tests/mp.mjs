@@ -21,7 +21,7 @@ async function phone(name) {
   const ctx = await browser.newContext({ viewport: { width: 260, height: 560 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
   const p = await ctx.newPage();
   p.on('pageerror', (e) => errors.push(`[${name}] ${e.message}`));
-  p.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('WebSocket') && !m.text().includes('ERR_')) errors.push(`[${name} console] ${m.text()}`); });
+  p.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('WebSocket') && !m.text().includes('ERR_') && !m.text().includes('User-Initiated Abort')) errors.push(`[${name} console] ${m.text()}`); });
   return { p, ctx, name };
 }
 

@@ -31,7 +31,7 @@ export class Screens {
     const standalone = window.navigator.standalone === true || window.matchMedia?.('(display-mode: standalone)').matches;
     const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const sub = summary
-      ? `Day ${summary.day} · ${summary.fish}/${JOURNAL_FISH.length} fish discovered`
+      ? `${summary.name && summary.name !== 'Cozy Cove' ? summary.name + ' · ' : ''}Day ${summary.day} · ${summary.fish}/${JOURNAL_FISH.length} fish`
       : 'A brand-new island is waiting!';
     const el = h('div', { class: 'screen title' },
       h('div', { class: 'logo' },

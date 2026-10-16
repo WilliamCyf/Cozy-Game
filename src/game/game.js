@@ -82,7 +82,7 @@ export class Game {
         this.ui.toast(e.m.replace(/^\S+\s/, ''), e.m.split(' ')[0], 3600);
       }
     }
-    if (this.ui.sheet && ops.some((op) => ['basket', 'coins', 'projects', 'journal', 'hats'].includes(op[1][0]))) {
+    if (this.ui.sheet && ops.some((op) => ['basket', 'coins', 'projects', 'journal', 'hats', 'request', 'stickers', 'name'].includes(op[1][0]))) {
       clearTimeout(this._refreshT);
       this._refreshT = setTimeout(() => this.ui.refreshSheet(), 120);
     }
@@ -127,6 +127,12 @@ export class Game {
       case 'pet': this.critters.petCat(f.pid); break;
       case 'cook': if (near(L.CAMPFIRE.x, L.CAMPFIRE.z)) this.fx.sparkle(L.CAMPFIRE.x, this.world.fire.y + 0.6, L.CAMPFIRE.z, 10, [1, 0.8, 0.5]); break;
       case 'rainbow': this.showRainbow(); break;
+      case 'picnic': {
+        const y = this.world.terrain.heightAt(L.PICNIC.x + 2, L.PICNIC.z);
+        for (let i = 0; i < 3; i++) setTimeout(() => this.fx.hearts(L.PICNIC.x + 2 + (Math.random() - 0.5) * 4, y - 1, L.PICNIC.z + (Math.random() - 0.5) * 3, 6), i * 300);
+        this.audio.fanfare();
+        break;
+      }
       default:
     }
   }
@@ -333,7 +339,7 @@ export class Game {
     g.strokeRect(pad / 2, pad / 2, W - pad, H - pad);
     g.font = `600 ${Math.round(pad * 1.3)}px Fredoka, ui-rounded, sans-serif`;
     g.fillStyle = 'rgba(255,248,232,0.92)';
-    const text = `Cozy Cove · Day ${this.session.state.day}`;
+    const text = `${this.session.state.name || 'Cozy Cove'} · Day ${this.session.state.day}`;
     const tw = g.measureText(text).width;
     g.fillRect(W - tw - pad * 3, H - pad * 3.2, tw + pad * 2, pad * 2);
     g.fillStyle = '#5a3d2b';

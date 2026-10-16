@@ -191,6 +191,25 @@ export class WorldView {
     this.beam.renderOrder = 31;
     scene.add(this.beam);
 
+    // campfire flames: three little cones, glowing warm, flickering
+    const flameGeo = new THREE.ConeGeometry(0.22, 0.75, 7, 1, true).translate(0, 0.37, 0);
+    this.flames = new THREE.Group();
+    const flameMat = new THREE.ShaderMaterial({
+      uniforms: { uTime: U.uTime },
+      vertexShader: 'varying float vY; void main(){ vY = position.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'varying float vY; void main(){ vec3 c = mix(vec3(1.0, 0.55, 0.12), vec3(1.0, 0.92, 0.45), clamp(vY * 1.4, 0.0, 1.0)); gl_FragColor = vec4(c * (1.0 - vY * 0.6), 1.0); }',
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    });
+    for (const [dx, dz, s] of [[0, 0, 1], [0.15, 0.1, 0.7], [-0.13, 0.08, 0.75]]) {
+      const f = new THREE.Mesh(flameGeo, flameMat);
+      f.position.set(dx, 0, dz);
+      f.scale.setScalar(s);
+      this.flames.add(f);
+    }
+    this.flames.position.set(L.CAMPFIRE.x, world.fire.y + 0.15, L.CAMPFIRE.z);
+    this.flames.renderOrder = 32;
+    scene.add(this.flames);
+
     this.sparkleT = 0;
     this.projDone = {};
     this.fireworkT = 0;
@@ -346,6 +365,12 @@ export class WorldView {
     d.crystal.position.y = this.world.lighthouse.y + Math.sin(time * 1.5) * 0.08;
     this.beam.visible = this.lighthouseOn && night > 0.05;
     if (this.beam.visible) this.beam.rotation.y += dt * 0.5;
+    // flickering campfire
+    this.flames.children.forEach((f, i) => {
+      const k = 0.85 + Math.sin(time * (9 + i * 3) + i) * 0.12 + Math.sin(time * 17 + i * 2) * 0.06;
+      f.scale.y = k * (i ? 0.75 : 1);
+      f.rotation.y = time * (1 + i * 0.3);
+    });
     // gentle boat bob
     d.boat.position.y = 0.12 + Math.sin(time * 1.3) * 0.05;
     d.boat.rotation.z = Math.sin(time * 0.9) * 0.03;

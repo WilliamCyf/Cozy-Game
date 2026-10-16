@@ -157,6 +157,14 @@ export function makeParticleAtlas() {
   g.arc(cx - 8, cy + 4, 18, 0, Math.PI * 2);
   g.arc(cx + 10, cy - 2, 16, 0, Math.PI * 2);
   g.fill();
+  // 8: butterfly (white so it can be tinted)
+  [cx, cy] = cell(8);
+  g.fillStyle = '#fff';
+  for (const s of [-1, 1]) {
+    g.beginPath(); g.ellipse(cx + s * 13, cy - 7, 13, 15, s * 0.5, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(cx + s * 10, cy + 12, 9, 10, -s * 0.4, 0, Math.PI * 2); g.fill();
+  }
+  g.fillRect(cx - 2, cy - 14, 4, 30);
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.NoColorSpace;
   tex.generateMipmaps = true;

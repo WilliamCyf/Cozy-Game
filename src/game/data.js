@@ -160,6 +160,41 @@ export const LETTERS = [
   { from: 'Mochi the Cat', text: 'meow meow. (A pumpkin seed? Where did Mochi find that?)', gift: { 'seed:pumpkin': 1 } },
 ];
 
+// Captain Shelly asks for something new every day
+export const REQUESTS = [
+  { item: 'shell', n: 3, reward: 40 }, { item: 'orange', n: 3, reward: 45 }, { item: 'coconut', n: 2, reward: 50 },
+  { item: 'berry', n: 4, reward: 40 }, { item: 'anyFish', n: 3, reward: 60 }, { item: 'carrot', n: 3, reward: 70, bonus: 'seed:pumpkin' },
+  { item: 'strawberry', n: 4, reward: 70 }, { item: 'flower', n: 5, reward: 45 }, { item: 'driftwood', n: 4, reward: 35 },
+  { item: 'starfish', n: 2, reward: 45, bonus: 'shrimp' }, { item: 'mushroom', n: 3, reward: 60, needs: 'path' }, { item: 'anyDish', n: 1, reward: 90, bonus: 'lure' },
+  { item: 'coral', n: 2, reward: 55 }, { item: 'potato', n: 3, reward: 60 }, { item: 'anyFish', n: 5, reward: 100, bonus: 'lure' },
+];
+
+// Sticker book: little awards the whole family earns together
+export const STICKERS = [
+  { id: 'firstFish', emoji: '🐟', name: 'First Catch', hint: 'Catch a fish', test: (s) => s.stats.fish >= 1 },
+  { id: 'angler', emoji: '🎣', name: 'Happy Anglers', hint: 'Catch 25 fish', test: (s) => s.stats.fish >= 25 },
+  { id: 'master', emoji: '🐳', name: 'Master Anglers', hint: 'Catch 100 fish', test: (s) => s.stats.fish >= 100 },
+  { id: 'collector', emoji: '📖', name: 'Collectors', hint: 'Discover 10 kinds of fish', test: (s) => Object.keys(s.journal).length >= 10 },
+  { id: 'professor', emoji: '🎓', name: 'Fish Professors', hint: 'Discover every fish', test: (s) => Object.keys(s.journal).length >= 27 },
+  { id: 'shiny', emoji: '⭐', name: 'Shiny!', hint: 'Catch a rare fish', test: (s, F) => Object.keys(s.journal).some((id) => F[id]?.rar === 'rare') },
+  { id: 'legend', emoji: '👑', name: 'Legendary!', hint: 'Catch a legendary fish', test: (s, F) => Object.keys(s.journal).some((id) => F[id]?.rar === 'legendary') },
+  { id: 'gardener', emoji: '🥕', name: 'Green Thumbs', hint: 'Grow 10 veggies', test: (s) => s.stats.crops >= 10 },
+  { id: 'farmer', emoji: '🌻', name: 'Farm Family', hint: 'Grow 60 veggies', test: (s) => s.stats.crops >= 60 },
+  { id: 'chef', emoji: '🍳', name: 'Little Chefs', hint: 'Cook a dish', test: (s) => s.stats.dishes >= 1 },
+  { id: 'feast', emoji: '🍱', name: 'Feast Makers', hint: 'Cook a Family Feast', test: (s) => (s.stats.feasts || 0) >= 1 },
+  { id: 'helper', emoji: '🐢', name: 'Shelly’s Helpers', hint: 'Help Captain Shelly 5 times', test: (s) => (s.stats.requests || 0) >= 5 },
+  { id: 'path', emoji: '🌲', name: 'Trailblazers', hint: 'Clear the forest path', test: (s) => s.projects.path?.done },
+  { id: 'bridge', emoji: '🌉', name: 'Bridge Builders', hint: 'Mend the old bridge', test: (s) => s.projects.bridge?.done },
+  { id: 'light', emoji: '💡', name: 'Lighthouse Keepers', hint: 'Light the lighthouse', test: (s) => s.projects.lighthouse?.done },
+  { id: 'festival', emoji: '🏮', name: 'Festival Stars', hint: 'Hold the Lantern Festival', test: (s) => s.projects.festival?.done },
+  { id: 'rich', emoji: '🪙', name: 'Piggy Bank', hint: 'Earn 1,000 coins', test: (s) => s.stats.earned >= 1000 },
+  { id: 'week', emoji: '🌅', name: 'Island Life', hint: 'Play for 7 days', test: (s) => s.stats.days >= 7 },
+  { id: 'fullhouse', emoji: '👨‍👩‍👧‍👦', name: 'Full House', hint: '4 players on the island at once', test: (s) => (s.stats.maxOnline || 1) >= 4 },
+  { id: 'cat', emoji: '🐱', name: 'Mochi’s Friends', hint: 'Pet Mochi 10 times', test: (s) => (s.stats.pets || 0) >= 10 },
+  { id: 'treasure', emoji: '🏴‍☠️', name: 'Treasure Hunters', hint: 'Dig up buried treasure', test: (s) => (s.stats.treasures || 0) >= 1 },
+  { id: 'picnic', emoji: '🧺', name: 'Picnic Pals', hint: 'Sit together at the picnic spot', test: (s) => (s.stats.picnics || 0) >= 1 },
+];
+
 export const START_STATE = {
   coins: 50,
   basket: { 'seed:carrot': 4, 'seed:strawberry': 2, shrimp: 2 },

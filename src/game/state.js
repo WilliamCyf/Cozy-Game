@@ -34,9 +34,13 @@ export function newWorldState({ code, plots, bushes, palms }) {
     players: {},
     mail: { day: 0 },
     treasure: { day: 0 },
-    stats: { fish: 0, dishes: 0, crops: 0, earned: 0, days: 1 },
+    stats: { fish: 0, dishes: 0, crops: 0, earned: 0, days: 1, feasts: 0, requests: 0, maxOnline: 1, pets: 0, treasures: 0, picnics: 0 },
     feed: [],
     nextItem: 1,
+    name: 'Cozy Cove',
+    request: null, // Captain Shelly's request of the day
+    stickers: [],
+    picnicDay: 0,
   };
   return s;
 }
@@ -59,6 +63,8 @@ export function migrate(saved, fresh) {
   }
   out.hats = Array.from(new Set([...(fresh.hats || []), ...(saved.hats || [])]));
   out.feed = Array.isArray(saved.feed) ? saved.feed.slice(-30) : [];
+  out.stickers = Array.isArray(saved.stickers) ? saved.stickers : [];
+  out.name = typeof saved.name === 'string' && saved.name.trim() ? saved.name.slice(0, 24) : fresh.name;
   out.v = SCHEMA;
   return out;
 }

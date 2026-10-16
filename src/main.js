@@ -126,7 +126,7 @@ async function boot() {
 
 function showTitle() {
   const saved = loadIsland();
-  screens.title(saved ? { day: saved.day, fish: Object.keys(saved.journal || {}).length } : null);
+  screens.title(saved ? { day: saved.day, fish: Object.keys(saved.journal || {}).length, name: saved.name } : null);
 }
 
 // A character standing on the deck so you can see your look on the title screen
