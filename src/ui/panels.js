@@ -327,7 +327,9 @@ export function familyPanel(g) {
       b.append(h('h3', {}, `On the island now (${S.online.size}/4)`));
       b.append(h('div', { class: 'list' }, [...S.online.entries()].map(([pid, o]) => h('div', { class: 'row-item' },
         h('span', { class: 'face', style: { borderColor: o.look?.accent, background: o.look?.shirt } }, (o.name || '?')[0]),
-        h('span', { class: 'grow' }, o.name, pid === S.pid ? ' (you)' : ''), pid === S.pid && S.isHost ? h('small', {}, 'host 🏠') : null))));
+        h('span', { class: 'grow' }, o.name, pid === S.pid ? ' (you)' : ''),
+        pid === S.pid && S.isHost ? h('small', {}, 'host 🏠') : null,
+        S.isHost && pid !== S.pid ? btn('Send home', () => { if (confirm(`Send ${o.name} home? They can join again later.`)) { S.kick(pid); g.ui.closeSheet(); } }, 'small ghost') : null))));
     },
   });
 }

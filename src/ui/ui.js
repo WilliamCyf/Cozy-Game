@@ -19,7 +19,7 @@ export class UI {
     this.build();
   }
 
-  get modalOpen() { return !!this.sheet || this.cardOpen; }
+  get modalOpen() { return !!this.sheet; }
 
   build() {
     const g = this.game;
@@ -109,7 +109,7 @@ export class UI {
     if (fs !== FS.NONE) {
       kind = 'fish';
       ic = '🎣';
-      label = { [FS.CHARGE]: 'Let go to cast!', [FS.FLY]: '…', [FS.WAIT]: 'Reel in', [FS.BITE]: 'Hook it!', [FS.REEL]: g.fishing.mg.hint, [FS.LANDED]: 'Yay!' }[fs];
+      label = { [FS.CHARGE]: 'Let go!', [FS.FLY]: '…', [FS.WAIT]: 'Reel in', [FS.BITE]: 'Hook it!', [FS.REEL]: g.fishing.mg.pulling ? 'Wait…' : 'Reel!', [FS.LANDED]: 'Yay!' }[fs];
       if (fs === FS.BITE) ic = '❗';
     } else {
       const t = g.interact.current;
@@ -211,7 +211,7 @@ export class UI {
     back.addEventListener('pointerdown', (e) => { if (e.target === back) close(); });
     back.appendChild(panel);
     this.root.appendChild(back);
-    this.sheet = { back, body, onClose, refresh: () => { body.innerHTML = ''; build(body, close); } };
+    this.sheet = { back, body, onClose, refresh: () => { const y = body.scrollTop; body.innerHTML = ''; build(body, close); body.scrollTop = y; } };
     build(body, close);
     requestAnimationFrame(() => back.classList.add('in'));
     this.game.audio.ui('open');
@@ -255,16 +255,21 @@ export class UI {
       if (res?.isNew) badges.push(h('span', { class: 'badge new' }, `NEW! ${Object.keys(g.session.state.journal).length}/${JOURNAL_FISH.length}`));
       if (res?.record) badges.push(h('span', { class: 'badge rec' }, 'Family record!'));
     }
+    this.closeCatch?.();
     const close = () => {
-      if (!card.isConnected) return;
+      if (!card.isConnected || card.classList.contains('closing')) return;
       this.cardOpen = false;
+      this.closeCatch = null;
+      card.classList.add('closing');
       card.classList.remove('in');
       setTimeout(() => card.remove(), 300);
     };
+    this.closeCatch = close;
     const card = h('div', { class: 'catch' }, h('div', { class: 'catch-card' },
       h('div', { class: 'catch-top' }, 'You caught…'),
       art, h('div', { class: 'catch-name' }, title), h('div', { class: 'catch-sub' }, sub), h('div', { class: 'badges' }, badges),
       tapButton({ class: 'btn primary', ontap: close }, extra === 'bottle' ? 'Aww 💛' : 'Yay! 🎉')));
+    card.firstChild.addEventListener('pointerdown', (e) => { e.stopPropagation(); close(); });
     this.root.appendChild(card);
     this.cardOpen = true;
     requestAnimationFrame(() => card.classList.add('in'));

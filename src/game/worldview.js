@@ -323,6 +323,8 @@ export class WorldView {
     const lh = !!pr.lighthouse?.done;
     const glowData = d.glows.geometry.attributes.aData;
     glowData.setW(d.lhIndex, lh ? 1 : 0);
+    const fest = !!pr.festival?.done;
+    for (let i = d.festStart; i < d.festEnd; i++) glowData.setW(i, fest ? 0.9 : 0);
     glowData.needsUpdate = true;
     this.lighthouseOn = lh;
     this.festival = !!pr.festival?.done;

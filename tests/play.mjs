@@ -173,11 +173,21 @@ try {
       await shot(p, 'scene-' + n);
     }
   } else if (scenario === 'landscape') {
+    const t = await newPhone('T', true);
+    await t.goto(base + '?nosw&nopeer&notry');
+    await wait(6000);
+    await shot(t, 'land-title');
     const p = await newPhone('A', true);
-    await p.goto(base + '?nosw&autostart=host&name=Dad&notut&fps');
+    await p.goto(base + '?nosw&nopeer&notry&autostart=host&name=Dad&notut');
     await p.waitForFunction(() => window.__game, null, { timeout: 60000 });
     await wait(2500);
     await shot(p, 'land1');
+    await p.evaluate(() => window.__game.openPanel('board'));
+    await wait(800);
+    await shot(p, 'land-board');
+    await p.evaluate(() => { window.__game.ui.closeSheet(); const L = window.__game.players.local; L.x = 24; L.z = 56; L.heading = 0; window.__game.fishing.press(); });
+    await wait(1500);
+    await shot(p, 'land-fish');
   }
 } catch (e) {
   errors.push('[test] ' + e.message);

@@ -17,7 +17,8 @@ let ok = true;
 const check = (cond, msg) => { console.log((cond ? 'PASS ' : 'FAIL ') + msg); if (!cond) ok = false; };
 
 async function phone(name) {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  // small screens: four software-drawn phones share one computer here
+  const ctx = await browser.newContext({ viewport: { width: 260, height: 560 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
   const p = await ctx.newPage();
   p.on('pageerror', (e) => errors.push(`[${name}] ${e.message}`));
   p.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('WebSocket') && !m.text().includes('ERR_')) errors.push(`[${name} console] ${m.text()}`); });
@@ -81,7 +82,7 @@ try {
   // a 5th player is turned away politely
   const extra = await phone('Gran');
   await extra.p.goto(base + `&join=${code}&name=Gran`);
-  await wait(9000);
+  await extra.p.waitForFunction(() => document.querySelector('.error') || window.__game, null, { timeout: 45000 }).catch(() => {});
   const extraState = await extra.p.evaluate(() => ({ joined: !!window.__game, text: document.querySelector('.error')?.textContent || '' }));
   check(!extraState.joined && /full/i.test(extraState.text), `5th player told the island is full ("${extraState.text}")`);
   await extra.ctx.close();

@@ -287,6 +287,20 @@ export async function buildWorld(scene, onProgress = () => {}) {
     glowPts.push(x, terrain.heightAt(x, z) + 0.6 + rr() * 1.2, z);
     glowData.push(0.5, rr(), 1, 1);
   }
+  // Lantern Festival: strings of lanterns along the paths (switched on later)
+  const festStart = glowPts.length / 3;
+  for (const path of L.PATHS) {
+    for (let sgi = 0; sgi < path.pts.length - 1; sgi++) {
+      const [ax, az] = path.pts[sgi], [bx, bz] = path.pts[sgi + 1];
+      const len = Math.hypot(bx - ax, bz - az);
+      for (let d = 1; d < len; d += 3.2) {
+        const t = d / len, x = ax + (bx - ax) * t + (sgi % 2 ? 1.6 : -1.6), z = az + (bz - az) * t;
+        glowPts.push(x, terrain.heightAt(x, z) + 2.4, z);
+        glowData.push(1.9, rr(), 0, 0);
+      }
+    }
+  }
+  const festEnd = glowPts.length / 3;
   const lhIndex = glowPts.length / 3;
   glowPts.push(lh.x, lh.y, lh.z);
   glowData.push(9, 0.3, 0, 0); // lighthouse glow (intensity set when restored)
@@ -308,7 +322,7 @@ export async function buildWorld(scene, onProgress = () => {}) {
     scene, root, terrain, mask, walk, atlas, propMat, outlineMat,
     plots, bushes, palms: ctx.palms, perches: ctx.perches, shop, board, fire, lighthouse: lh,
     lipX, sea, pond, fall,
-    dyn: { crystal, bridgeRepair, bridgeBroken, boat, logs, picnic, gardenExpansion, glows, lhIndex, bridgeGap: bridgeInfo.gapSurface },
+    dyn: { crystal, bridgeRepair, bridgeBroken, boat, logs, picnic, gardenExpansion, glows, lhIndex, festStart, festEnd, bridgeGap: bridgeInfo.gapSurface },
     setOutlines(on) {
       root.traverse((o) => { if (o.userData.outline) o.visible = on; });
     },

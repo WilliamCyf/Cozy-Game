@@ -156,6 +156,7 @@ export class PlayerManager {
         scene.remove(r.tag);
         r.tag.userData.dispose?.();
         r.tag = makeNameTag(o.name || 'Friend', o.look?.accent || '#3aa39a');
+        r.tag.visible = r.seen && this.ctx.settings?.nameTags !== false;
         scene.add(r.tag);
       }
     }
@@ -188,7 +189,7 @@ export class PlayerManager {
       const k = span > 0 ? clamp((rt - a.t) / span, 0, 1) : 1;
       const tx = lerp(a.s[0], b.s[0], k), tz = lerp(a.s[1], b.s[1], k);
       const th = a.s[2] + angleDiff(a.s[2], b.s[2]) * k;
-      if (!r.seen) { r.x = tx; r.z = tz; r.heading = th; r.y = world.walk.groundY(tx, tz); r.seen = true; r.char.setVisible(true); r.tag.visible = true; }
+      if (!r.seen) { r.x = tx; r.z = tz; r.heading = th; r.y = world.walk.groundY(tx, tz); r.seen = true; r.char.setVisible(true); r.tag.visible = this.ctx.settings?.nameTags !== false; }
       const ox = r.x, oz = r.z;
       // big jump (teleport / reconnect) -> snap, otherwise glide
       if (Math.hypot(tx - r.x, tz - r.z) > 6) { r.x = tx; r.z = tz; }

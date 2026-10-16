@@ -1,0 +1,21 @@
+// Two different islands accidentally get the same code -> they should notice and change.
+import { chromium } from 'playwright';
+import { startServers } from './servers.mjs';
+const servers = startServers();
+const base = 'http://localhost:8080/?nosw&notut&quality=saver&nopeer&signal=127.0.0.1:9000&relay=ws://127.0.0.1:7777';
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const mk = async () => { const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 }); return c.newPage(); };
+const a = await mk(), b = await mk();
+await a.goto(base + '&autostart=host&name=A');
+await b.goto(base + '&autostart=host&name=B');
+await a.waitForFunction(() => window.__game, null, { timeout: 60000 });
+await b.waitForFunction(() => window.__game, null, { timeout: 60000 });
+const codeA = await a.evaluate(() => window.__game.session.code);
+await b.evaluate((c) => { const s = window.__game.session; s.transport.stop(); s.state.code = c; s.startTransport(); }, codeA);
+await wait(12000);
+const [ca, cb] = await Promise.all([a.evaluate(() => window.__game.session.code), b.evaluate(() => window.__game.session.code)]);
+console.log('codes after collision:', codeA, '->', ca, '/', cb, ca !== cb ? 'PASS (different now)' : 'FAIL');
+await browser.close();
+servers.close();
+process.exit(0);

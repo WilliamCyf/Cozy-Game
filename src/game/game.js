@@ -23,7 +23,7 @@ export class Game {
     this.blobs = new BlobShadows(scene);
     this.fx = new FX(scene, world.atlas, this.rig.camera, this.uiRoot);
     this.ui = new UI(this.uiRoot, this);
-    this.players = new PlayerManager({ scene, world, session, input: this.input, rig: this.rig, fx: this.fx, audio: this.audio, ui: this.ui });
+    this.players = new PlayerManager({ scene, world, session, input: this.input, rig: this.rig, fx: this.fx, audio: this.audio, ui: this.ui, settings: this.settings });
     this.critters = new Critters({ scene, world, session, fx: this.fx, audio: this.audio, blobs: this.blobs, spawns: this.spawns });
     this.fishing = new Fishing({ scene, world, players: this.players, session, fx: this.fx, audio: this.audio, ui: this.ui, critters: this.critters, settings: this.settings });
     this.worldview = new WorldView(world, session, this.fx);
@@ -52,6 +52,10 @@ export class Game {
     session.on('left', (pid) => { const n = session.state.players[pid]?.name; if (n) this.ui.toast(`${n} went home for now.`, '🏡', 2200); });
     session.on('snap', () => { if (session.lastSnapMsg?.cat) this.critters.setRemoteCat(session.lastSnapMsg.cat); });
     session.on('netstatus', () => this.ui.renderFamily());
+    session.on('codechanged', (code) => {
+      this.ui.toast(`Another island was using our code, so we got a new one: ${code}`, '🔑', 6000);
+      try { sessionStorage.setItem('cozycove.resume', JSON.stringify({ mode: 'host', code })); } catch { /* ignore */ }
+    });
     session.on('lost', () => this.onLost());
     if (session.isHost) session.snapExtra = () => ({ cat: this.critters.catState() });
     session.posProvider = () => this.players.packet();
@@ -157,6 +161,7 @@ export class Game {
     this.actionHeld = true;
     this.lastTouch = performance.now();
     if (this.ui.modalOpen) return;
+    this.ui.closeCatch?.();
     if (this.cooking) return;
     const target = this.interact.current;
     if (this.fishing.active || target?.type === 'fish') {
@@ -357,7 +362,7 @@ export class Game {
     if (this.leaving) return;
     if (this.fishing.active) this.fishing.stop();
     const kick = this.session.kicked;
-    if (kick?.why === 'closed' || kick?.why === 'full' || kick?.why === 'version') {
+    if (kick && ['closed', 'full', 'version', 'self', 'sent'].includes(kick.why)) {
       this.ui.showOverlay(`<div class="big-emoji">🌙</div><p>${kick.msg}</p>`, [['Back to menu', () => this.backToMenu(), 'primary']]);
       return;
     }
@@ -449,6 +454,7 @@ export class Game {
     this.interact.update(dt);
     this.worldview.update(dt, this.time, this.daynight.night, P.x, P.z);
     if (this.daynight.rain > 0.05) this.fx.rain(P.x, P.z, this.daynight.rain, dt);
+    this.ambientFx(dt, P);
     this.fishing.draw(this.time);
     this.fx.update(dt);
     this.ui.update(dt);
@@ -479,6 +485,28 @@ export class Game {
       }
     }
     void FS;
+  }
+
+  // little touches: mist where the waterfall lands, leaves drifting from palm trees
+  ambientFx(dt, P) {
+    this.mistT = (this.mistT || 0) - dt;
+    const fx = this.world.lipX + 2.8, fz = L.WATERFALL.z;
+    if (this.mistT <= 0 && Math.abs(P.x - fx) < 26 && Math.abs(P.z - fz) < 26) {
+      this.mistT = 0.12;
+      const a = Math.random() * Math.PI * 2, r = Math.random() * 1.6;
+      this.fx.spawn(fx + Math.cos(a) * r, 0.2, fz + Math.sin(a) * r * 1.4, (Math.random() - 0.5) * 0.6, 0.8 + Math.random() * 0.6, (Math.random() - 0.5) * 0.6, 1.6, 0.9, 7, 1, 1, 1, 0.55, 0, 1.4);
+      if (Math.random() < 0.5) this.fx.spawn(fx + (Math.random() - 0.5) * 2.5, 0.1, fz + (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 2, 2 + Math.random() * 2, (Math.random() - 0.5) * 2, 0.6, 0.18, 0, 1, 1, 1, 0.9, 8);
+    }
+    this.leafT = (this.leafT || 2) - dt;
+    if (this.leafT <= 0) {
+      this.leafT = 2.5 + Math.random() * 4;
+      let best = null, bd = 16 * 16;
+      for (const p of this.world.palms) {
+        const d = (p.x - P.x) ** 2 + (p.z - P.z) ** 2;
+        if (d < bd && Math.random() < 0.6) { bd = d; best = p; }
+      }
+      if (best) this.fx.leaves(best.top[0], best.top[1] - 0.3, best.top[2], 1, [0.5, 0.78, 0.3]);
+    }
   }
 
   render() {

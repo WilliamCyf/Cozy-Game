@@ -249,6 +249,7 @@ export class HostLogic {
       ops.push(['inc', ['players', pid, 'caught'], 1]);
     }
     this.ops(ops);
+    if (isNew) this.checkProjects();
     if (isNew) {
       const total = Object.keys(this.s.journal).length;
       this.feed(`📖 ${name} discovered the ${f.name}! (${total}/${JOURNAL_FISH.length} in the journal)`, { pid });
@@ -369,7 +370,17 @@ export class HostLogic {
     // finished?
     const allDone = Object.keys(p.needs).every((k) => this.projectLeft(p, k) <= 0);
     if (allDone) this.completeProject(p);
+    else this.checkProjects();
     return { ok: true, n, done: allDone };
+  }
+
+  // finish any project whose needs are all met (some needs fill up by themselves, like the journal)
+  checkProjects() {
+    for (const p of PROJECTS) {
+      const st = this.s.projects[p.id];
+      if (!st || st.done || !this.projectAvailable(p)) continue;
+      if (Object.keys(p.needs).every((k) => this.projectLeft(p, k) <= 0)) this.completeProject(p);
+    }
   }
 
   completeProject(p) {
@@ -378,6 +389,8 @@ export class HostLogic {
     this.ops(ops);
     this.feed(`🎉 Family project complete: ${p.name}! ${p.reward}`);
     this.fx({ kind: 'project', id: p.id });
+    // finishing one project may unlock (and already satisfy) the next
+    if (p.id !== 'festival') this.checkProjects();
   }
 
   a_mail(pid) {

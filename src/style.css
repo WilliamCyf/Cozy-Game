@@ -142,7 +142,7 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 .bait-name { font-size: 12px; font-weight: 600; }
 .emotes { position: absolute; bottom: 180px; right: 0; display: flex; gap: 6px; background: var(--cream); border: 3px solid var(--line); border-radius: 26px; padding: 6px; box-shadow: 0 4px 0 rgba(90, 61, 43, 0.2); }
 .emote { width: 46px; height: 46px; border-radius: 50%; font-size: 26px; background: var(--paper); }
-.toasts { position: absolute; left: 50%; top: calc(var(--safe-t) + 64px); transform: translateX(-50%); width: min(92vw, 420px); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.toasts { position: absolute; left: 50%; top: calc(var(--safe-t) + 104px); transform: translateX(-50%); width: min(92vw, 420px); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
 .toast {
   display: flex; gap: 8px; align-items: center;
   background: var(--paper); border: 3px solid var(--line); border-radius: 18px;
@@ -154,7 +154,7 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 .toast.in { opacity: 1; transform: none; }
 .toast.out { opacity: 0; transform: translateY(-8px); }
 .toast.solo { position: absolute; left: 50%; top: calc(var(--safe-t) + 20px); transform: translateX(-50%); z-index: 50; }
-.hint { position: absolute; left: 50%; bottom: calc(var(--safe-b) + 140px); transform: translateX(-50%); background: rgba(90, 61, 43, 0.82); color: #fff; padding: 8px 16px; border-radius: 18px; font-weight: 600; font-size: 15px; white-space: nowrap; animation: bob 2.4s ease-in-out infinite; pointer-events: none; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
+.hint { position: absolute; left: 50%; top: calc(var(--safe-t) + 60px); transform: translateX(-50%); background: rgba(90, 61, 43, 0.82); color: #fff; padding: 8px 16px; border-radius: 18px; font-weight: 600; font-size: 15px; white-space: nowrap; animation: bob 2.4s ease-in-out infinite; pointer-events: none; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
 .stick-base { position: absolute; left: 0; top: 0; width: 108px; height: 108px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.7); background: rgba(255, 255, 255, 0.18); opacity: 0; transition: opacity 0.15s; pointer-events: none !important; }
 .stick-base.on { opacity: 1; }
 .stick-knob { position: absolute; left: 30px; top: 30px; width: 48px; height: 48px; border-radius: 50%; background: rgba(255, 248, 232, 0.95); border: 3px solid var(--line2); }
@@ -303,8 +303,8 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 .code-input { text-align: center; font-size: 34px; letter-spacing: 4px; text-transform: uppercase; }
 
 /* ------------------------------------------------ catch card & overlays */
-.catch { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 30; pointer-events: auto; background: rgba(40, 30, 20, 0); transition: background 0.3s; }
-.catch.in { background: rgba(40, 30, 20, 0.25); }
+.catch { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 30; pointer-events: none !important; }
+.catch-card { pointer-events: auto; }
 .catch-card { width: min(84vw, 340px); background: var(--cream); border: 4px solid var(--line); border-radius: 28px; padding: 14px 16px 18px; text-align: center; transform: scale(0.6); opacity: 0; transition: transform 0.35s cubic-bezier(0.2, 1.4, 0.4, 1), opacity 0.25s; box-shadow: 0 8px 0 rgba(90, 61, 43, 0.2); }
 .catch.in .catch-card { transform: none; opacity: 1; }
 .catch-top { font-size: 14px; color: var(--ink2); font-weight: 600; }
@@ -353,8 +353,8 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
   .emotes { bottom: 150px; }
   .sheet { max-height: 92%; max-width: 620px; }
   .sheet.tall, .sheet.look { max-height: 94%; }
-  .toasts { top: calc(var(--safe-t) + 54px); }
-  .hint { bottom: calc(var(--safe-b) + 18px); }
+  .toasts { top: calc(var(--safe-t) + 92px); }
+  .hint { top: calc(var(--safe-t) + 52px); }
   .logo { margin-top: 2vh; }
   .logo-text { font-size: 44px; }
   .logo-sun { width: 56px; height: 56px; }

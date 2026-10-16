@@ -35,6 +35,7 @@ function trysteroConfig(code) {
   return c;
 }
 const usePeer = !params.has('nopeer');
+const dbg = params.has('netdebug') ? (...a) => console.log('[dbg] net', ...a) : () => {};
 const useTry = !params.has('notry');
 
 // A Link = one open conversation with one other phone.
@@ -102,8 +103,9 @@ class Link {
 
 // ------------------------------------------------------------------ hosting
 export class HostTransport {
-  constructor(code, onLink) {
+  constructor(code, onLink, created = Date.now()) {
     this.code = code;
+    this.created = created;
     this.onLink = onLink;
     this.peer = null;
     this.room = null;
@@ -112,6 +114,7 @@ export class HostTransport {
     this.stopped = false;
     this.retry = null;
     this.onStatus = null;
+    this.onCollision = null; // another island is using our code
     this.idTaken = 0;
   }
   start() {
@@ -147,7 +150,12 @@ export class HostTransport {
         if (t === 'peer-unavailable') return; // not about us
         this.peerOk = false;
         this.onStatus?.();
-        if (t === 'unavailable-id') this.idTaken++;
+        if (t === 'unavailable-id') {
+          this.idTaken++;
+          // still taken after ~80 s (longer than the server's 60 s timeout for a crashed app):
+          // that's someone else's island, not our own old session
+          if (this.idTaken >= 13) { this.onCollision?.(); return; }
+        }
         // try again in a little while (the old session may still be closing)
         try { peer.destroy(); } catch { /* ignore */ }
         if (!this.stopped) {
@@ -161,12 +169,25 @@ export class HostTransport {
   }
   startTrystero() {
     try {
-      const room = joinRoom(trysteroConfig(this.code), 'island-' + this.code.toLowerCase());
+      // Handshake: before two phones connect they say who they are. Hosts only accept guests,
+      // guests only accept a host — so guests never connect to each other (simpler & sturdier),
+      // and if two HOSTS meet, two islands share a code: the newer island picks a new one.
+      const room = joinRoom(trysteroConfig(this.code), 'island-' + this.code.toLowerCase(), {
+        onPeerHandshake: async (peerId, send, receive) => {
+          await send({ role: 'host', c: this.created });
+          const { data } = await receive();
+          if (data?.role === 'host') {
+            if ((data.c || 0) <= this.created) this.onCollision?.();
+            throw new Error('two hosts');
+          }
+        },
+        onJoinError: (d) => dbg('host: handshake refused', d?.error),
+      });
       this.room = room;
       const act = room.makeAction('m');
       this.tryAct = act;
       room.onPeerJoin = (peerId) => {
-        act.send('{"k":"iamhost"}', { target: peerId });
+        dbg('host: peer join', peerId);
         let link = this.tryLinks.get(peerId);
         if (link && !link.closed) return;
         link = new Link('trystero', (s) => act.send(s, { target: peerId }), () => {});
@@ -174,6 +195,7 @@ export class HostTransport {
         this.onLink(link);
       };
       room.onPeerLeave = (peerId) => {
+        dbg('host: peer leave', peerId);
         const link = this.tryLinks.get(peerId);
         this.tryLinks.delete(peerId);
         link?.dropped();
@@ -249,21 +271,31 @@ export function joinHost(code, timeoutMs = 20000) {
 
     if (useTry) {
       try {
-        const room = joinRoom(trysteroConfig(code), 'island-' + code.toLowerCase());
-        const act = room.makeAction('m');
+        const hosts = new Set();
         let link = null, hostId = null;
+        const room = joinRoom(trysteroConfig(code), 'island-' + code.toLowerCase(), {
+          onPeerHandshake: async (peerId, send, receive) => {
+            await send({ role: 'guest' });
+            const { data } = await receive();
+            if (data?.role !== 'host') throw new Error('guests don\u2019t connect to each other');
+            hosts.add(peerId);
+          },
+          onJoinError: (d) => dbg('guest: handshake refused', d?.error),
+        });
+        const act = room.makeAction('m');
         cleanups.push({ kind: 'trystero', fn: () => { try { room.leave(); } catch { /* ignore */ } } });
+        room.onPeerJoin = (peerId) => {
+          dbg('guest: peer join', peerId, hosts.has(peerId) ? '(host)' : '');
+          if (link || !hosts.has(peerId)) return;
+          hostId = peerId;
+          link = new Link('trystero', (s) => act.send(s, { target: hostId }), () => { try { room.leave(); } catch { /* ignore */ } });
+          finish(null, link, 'trystero');
+        };
         act.onMessage = (data, meta) => {
           const peerId = meta?.peerId ?? meta;
-          if (!link && data === '{"k":"iamhost"}') {
-            hostId = peerId;
-            link = new Link('trystero', (s) => act.send(s, { target: hostId }), () => { try { room.leave(); } catch { /* ignore */ } });
-            finish(null, link, 'trystero');
-            return;
-          }
           if (link && peerId === hostId) link.receive(data);
         };
-        room.onPeerLeave = (peerId) => { if (link && peerId === hostId) link.dropped(); };
+        room.onPeerLeave = (peerId) => { dbg('guest: peer leave', peerId, peerId === hostId ? '(host!)' : ''); if (link && peerId === hostId) link.dropped(); };
       } catch (e) {
         console.warn('trystero join failed', e);
       }
@@ -278,7 +310,7 @@ const WORDS = ['CRAB', 'FISH', 'SHELL', 'WAVE', 'SUN', 'PALM', 'BOAT', 'STAR', '
   'SEAL', 'GULL', 'TURTLE', 'SQUID', 'TUNA', 'KOI', 'LILY', 'DAISY', 'FERN', 'MAPLE', 'CLOUD', 'RAIN', 'BREEZE', 'COCO', 'BEACH', 'COVE', 'ISLE', 'NEMO'];
 export function makeIslandCode() {
   const w = WORDS[Math.floor(Math.random() * WORDS.length)];
-  const n = String(10 + Math.floor(Math.random() * 90));
+  const n = String(100 + Math.floor(Math.random() * 900));
   return w + n;
 }
 export function cleanCode(s) {

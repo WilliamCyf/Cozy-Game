@@ -6,6 +6,7 @@ import { HostLogic } from './host.js';
 import { HostTransport, joinHost, makeIslandCode } from '../net/transport.js';
 
 export const PROTOCOL = 3;
+const dbg = new URLSearchParams(location.search).has('netdebug') ? (...a) => console.log('[dbg] session', ...a) : () => {};
 export const MAX_PLAYERS = 4;
 const SNAP_MS = 100;
 
@@ -47,14 +48,45 @@ export class Session extends Emitter {
     this.links = new Set();
     this.logic.a_hello(this.pid, { name: this.profile.name, look: this.profile.look });
     this.online.set(this.pid, { name: this.profile.name, look: this.profile.look, s: null, t: performance.now() });
-    this.transport = new HostTransport(this.state.code, (link) => this.acceptLink(link));
-    this.transport.onStatus = () => this.emit('netstatus');
-    this.transport.start();
+    this.startTransport();
     this.connected = true;
     this.flush();
     this.emit('state');
     this.emit('players');
     saveIsland(this.state);
+    this.startHeartbeat();
+  }
+
+  startTransport() {
+    this.transport = new HostTransport(this.state.code, (link) => this.acceptLink(link), this.state.created);
+    this.transport.onStatus = () => this.emit('netstatus');
+    this.transport.onCollision = () => this.changeCode();
+    this.transport.start();
+  }
+
+  // Another island happens to use our code: pick a fresh one (family already here stay connected).
+  changeCode() {
+    if (this.changingCode || this.ended) return;
+    this.changingCode = true;
+    const old = this.transport;
+    setTimeout(() => {
+      try { old.stop(); } catch { /* ignore */ }
+      this.emitOps([['set', ['code'], makeIslandCode()]]);
+      this.save();
+      this.startTransport();
+      this.changingCode = false;
+      this.emit('codechanged', this.state.code);
+    }, 300);
+  }
+
+  // Host only: send someone home (they can come back later)
+  kick(pid) {
+    for (const l of this.links) {
+      if (l.pid === pid) {
+        l.send({ k: 'kick', why: 'sent', msg: 'The host sent you home for now. 🏡' });
+        setTimeout(() => l.close(), 400);
+      }
+    }
   }
 
   acceptLink(link) {
@@ -72,8 +104,13 @@ export class Session extends Emitter {
         }
         const id = String(m.pid || '').slice(0, 40);
         if (!id) return;
+        if (id === this.pid) {
+          link.send({ k: 'kick', why: 'self', msg: 'This phone is already the host of this island. Use another phone to join!' });
+          setTimeout(() => link.close(), 500);
+          return;
+        }
         // same person reconnecting? drop their old link
-        for (const other of this.links) if (other.pid === id && other !== link) { other.pid = null; other.close(); this.links.delete(other); }
+        for (const other of this.links) if (other.pid === id && other !== link) { dbg('replacing old link of', id); other.pid = null; other.close(); this.links.delete(other); }
         const count = [...this.online.keys()].filter((p) => p !== id).length;
         if (count >= MAX_PLAYERS) {
           link.send({ k: 'kick', why: 'full', msg: 'This island is full (4 players). Try again when someone leaves.' });
@@ -102,7 +139,7 @@ export class Session extends Emitter {
         link.send({ k: 'rep', rid: m.rid, res });
         return;
       }
-      if (m.k === 'bye') link.close();
+      if (m.k === 'bye') { dbg('bye from', pid); link.close(); }
     });
     link.onClose(() => {
       clearTimeout(helloTimer);
@@ -169,6 +206,7 @@ export class Session extends Emitter {
           for (const p of m.online) this.online.set(p.pid, { name: p.name, look: p.look, s: null, t: performance.now() });
           this.connected = true;
           this.lastSnap = performance.now();
+          this.startHeartbeat();
           this.emit('state');
           this.emit('players');
           resolve();
@@ -266,6 +304,21 @@ export class Session extends Emitter {
     });
   }
 
+  // A tiny "still here!" every second, even if the screen isn't drawing (menus, slow moments).
+  startHeartbeat() {
+    clearInterval(this.hb);
+    this.hb = setInterval(() => {
+      if (document.hidden || this.ended) return;
+      const t = performance.now();
+      if (this.role === 'guest' && this.connected && t - (this.lastSent || 0) > 900) {
+        this.lastSent = t;
+        this.link?.send({ k: 'pos', s: this.posProvider?.() || this.myPos });
+      } else if (this.role === 'host' && t - (this.snapT || 0) > 900) {
+        this.update(0, t);
+      }
+    }, 1000);
+  }
+
   setMyPos(s) { this.myPos = s; }
   // the game gives us a function that builds our position message when we need it
   get myPos() { return this._myPos || this.posProvider?.() || null; }
@@ -276,11 +329,11 @@ export class Session extends Emitter {
       this.logic.tick(dt);
       // drop guests we haven't heard from in a while
       for (const l of this.links) {
-        if (l.pid && now - l.lastHeard > 15000) l.close();
+        if (l.pid && now - l.lastHeard > 15000) { dbg('timeout', l.pid, now, l.lastHeard); l.close(); }
       }
-      this.snapT += dt * 1000;
-      if (this.snapT >= SNAP_MS) {
-        this.snapT = 0;
+      // network timing uses the real clock (not the frame rate), so a slow frame never starves it
+      if (now - this.snapT >= SNAP_MS) {
+        this.snapT = now;
         const me = this.online.get(this.pid);
         if (me) { me.s = this.posProvider?.() || null; me.t = now; }
         const p = {};
@@ -290,10 +343,11 @@ export class Session extends Emitter {
       } else this.flush();
       this.saveT += dt;
       if (this.saveT > 12 && this.dirty) this.save();
+      else if (this.saveT > 45) this.save(); // keep the time of day saved too
     } else if (this.role === 'guest' && this.connected) {
-      this.snapT += dt * 1000;
-      if (this.snapT >= SNAP_MS && this.posProvider) {
-        this.snapT = 0;
+      if (now - this.snapT >= SNAP_MS && this.posProvider) {
+        this.snapT = now;
+        this.lastSent = performance.now();
         this.link?.send({ k: 'pos', s: this.posProvider() });
       }
       // keep the clock moving smoothly between snapshots
@@ -319,6 +373,7 @@ export class Session extends Emitter {
 
   leave() {
     this.ended = true;
+    clearInterval(this.hb);
     if (this.role === 'host') {
       this.save();
       this.broadcast({ k: 'kick', why: 'closed', msg: 'The host closed the island for now. 🌙' });
