@@ -57,8 +57,11 @@ Pick **one** option:
 | 🎣 **Fish** | Face the water, **hold** the button, let go to cast. When the bobber dips — **tap!** Then **hold** to reel and **let go** when the fish splashes, so the line doesn't snap. |
 | 🌱 **Garden** | Plant seeds next to the cottage, water them, harvest when they sparkle. Rain waters them for you. |
 | 📋 **Family Board** | Shared goals that open new places and new fish. |
-| ✉️ **Every day** | A letter with a gift in the mailbox, and buried treasure on Turtle Islet. |
+| ✉️ **Every day** | A letter with a gift in the mailbox, buried treasure on Turtle Islet, and a new request from Captain Shelly at the shop. |
 | 📖 **Fish Journal** | 27 kinds of fish to discover — some only at night, at sunset, in the rain, or in special places. |
+| 🏅 **Sticker Book** | 22 family awards to collect together (Journal → Stickers). |
+| 🧺 **Picnic** | Sit together on the picnic blanket (2+ people) for a small daily bonus. |
+| 🏝️ **Island name** | The host can name your island in ☰ → Family & Invite. |
 
 ## 5. Cool phone, happy battery
 
