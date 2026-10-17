@@ -63,12 +63,8 @@ export class DayNight {
   }
 }
 
-export function formatClock(hour) {
-  const h = Math.floor(hour), m = Math.floor((hour - h) * 60 / 10) * 10;
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const hh = h % 12 === 0 ? 12 : h % 12;
-  return `${hh}:${String(m).padStart(2, '0')} ${ampm}`;
-}
+// (the clock text lives with the languages, because Thai clocks use 24 hours)
+export { formatClock } from '../i18n/i18n.js';
 export function timeIcon(hour, raining) {
   if (raining) return '🌧️';
   if (hour >= 5.5 && hour < 7) return '🌅';

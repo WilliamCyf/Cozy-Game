@@ -1,5 +1,6 @@
 // Floating name label above each family member (drawn once into a little picture).
 import * as THREE from 'three';
+import { CANVAS_FONT, hasThai } from '../i18n/i18n.js';
 
 export function makeNameTag(name, color) {
   const cv = document.createElement('canvas');
@@ -7,22 +8,31 @@ export function makeNameTag(name, color) {
   cv.width = W;
   cv.height = H;
   const g = cv.getContext('2d');
-  g.font = "600 34px Fredoka, ui-rounded, system-ui, sans-serif";
-  const text = name.slice(0, 12);
-  const tw = Math.min(W - 20, g.measureText(text).width + 34);
-  const x0 = (W - tw) / 2;
-  g.fillStyle = 'rgba(255, 248, 232, 0.95)';
-  roundRect(g, x0, 10, tw, 50, 24);
-  g.fill();
-  g.lineWidth = 5;
-  g.strokeStyle = color;
-  roundRect(g, x0, 10, tw, 50, 24);
-  g.stroke();
-  g.fillStyle = '#5a3d2b';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.fillText(text, W / 2, 37);
+  const font = `600 34px ${CANVAS_FONT}`;
+  const text = shorten(name, 12);
+  const draw = () => {
+    g.clearRect(0, 0, W, H);
+    g.font = font;
+    const tw = Math.min(W - 20, g.measureText(text).width + 34);
+    const x0 = (W - tw) / 2;
+    g.fillStyle = 'rgba(255, 248, 232, 0.95)';
+    roundRect(g, x0, 10, tw, 50, 24);
+    g.fill();
+    g.lineWidth = 5;
+    g.strokeStyle = color;
+    roundRect(g, x0, 10, tw, 50, 24);
+    g.stroke();
+    g.fillStyle = '#5a3d2b';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, W / 2, 37);
+  };
+  draw();
   const tex = new THREE.CanvasTexture(cv);
+  // a Thai name drawn before the Thai font arrived: draw it again once the font is ready (only once)
+  if (hasThai(text) && document.fonts && !document.fonts.check(font, text)) {
+    document.fonts.load(font, text).then(() => { draw(); tex.needsUpdate = true; }).catch(() => {});
+  }
   tex.colorSpace = THREE.NoColorSpace;
   tex.minFilter = THREE.LinearFilter;
   tex.generateMipmaps = false;
@@ -32,6 +42,18 @@ export function makeNameTag(name, color) {
   s.renderOrder = 50;
   s.userData.dispose = () => { tex.dispose(); mat.dispose(); };
   return s;
+}
+
+// Keep at most n letters. Thai tone marks and vowels sit on top of / under a letter and must stay
+// with it, so count whole letters ("graphemes") when the phone can, not single characters.
+function shorten(s, n) {
+  const str = String(s || '');
+  if (str.length <= n) return str;
+  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    const parts = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(str), (x) => x.segment);
+    return parts.slice(0, n).join('');
+  }
+  return str.slice(0, n);
 }
 
 function roundRect(g, x, y, w, h, r) {

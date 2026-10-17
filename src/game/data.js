@@ -1,5 +1,7 @@
 // All the game's content in one place: fish, crops, recipes, shop, family projects.
 // (Keeping content separate from logic means new fish or recipes are one line each.)
+// Names stay in English here; they are translated when shown (see src/i18n).
+import { t } from '../i18n/i18n.js';
 
 export const RARITY = {
   common: { label: 'Common', stars: 1, weight: 60, diff: 0.6, color: '#8bbf6a' },
@@ -201,5 +203,5 @@ export const START_STATE = {
   hats: ['straw', 'sunhat', 'cap', 'beanie'],
 };
 
-export const itemName = (id) => ITEMS[id]?.name || id;
+export const itemName = (id) => t(ITEMS[id]?.name || id);
 export const itemEmoji = (id) => ITEMS[id]?.emoji || '❔';

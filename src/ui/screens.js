@@ -3,6 +3,7 @@ import { h, tapButton } from './dom.js';
 import { buildLookEditor } from './lookeditor.js';
 import { cleanCode } from '../net/transport.js';
 import { JOURNAL_FISH } from '../game/data.js';
+import { LANGS, getLang } from '../i18n/i18n.js';
 
 export class Screens {
   constructor(root, ctx) {
@@ -33,7 +34,10 @@ export class Screens {
     const sub = summary
       ? `${summary.name && summary.name !== 'Cozy Cove' ? summary.name + ' · ' : ''}Day ${summary.day} · ${summary.fish}/${JOURNAL_FISH.length} fish`
       : 'A brand-new island is waiting!';
+    // language switch: shows the OTHER language, written in that language (so anyone can find it)
+    const other = LANGS.find((l) => l.id !== getLang());
     const el = h('div', { class: 'screen title' },
+      tapButton({ class: 'lang-btn', ontap: () => { c.audio.ui?.('tap'); c.setLang(other.id); } }, `${other.flag} ${other.label}`),
       h('div', { class: 'logo' },
         h('div', { class: 'logo-sun' }),
         h('div', { class: 'logo-text' }, 'Cozy Cove'),

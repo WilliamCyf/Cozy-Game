@@ -5,6 +5,7 @@ import { formatClock, timeIcon } from '../game/daynight.js';
 import { FS } from '../game/fishing.js';
 import { BAITS, FISH_BY_ID, RARITY, ITEMS, JOURNAL_FISH } from '../game/data.js';
 import { fishSVG } from './fishart.js';
+import { t } from '../i18n/i18n.js';
 
 export class UI {
   constructor(root, game) {
@@ -94,9 +95,14 @@ export class UI {
     const g = this.game;
     const s = g.session.state;
     if (!s) return;
-    setText(this.clockText, formatClock(s.time));
-    setText(this.clockIcon, timeIcon(s.time, s.weather === 'rain'));
-    setText(this.dayText, `Day ${s.day}`);
+    // the clock only changes every 10 game-minutes: rebuild its text only then (no new strings every frame)
+    const clockKey = Math.floor(s.time * 6) * 2 + (s.weather === 'rain' ? 1 : 0);
+    if (clockKey !== this._clockKey) {
+      this._clockKey = clockKey;
+      setText(this.clockText, formatClock(s.time));
+      setText(this.clockIcon, timeIcon(s.time, s.weather === 'rain'));
+    }
+    if (s.day !== this._day) { this._day = s.day; setText(this.dayText, t('Day {n}', { n: s.day })); }
     if (this.coinsText._t !== String(s.coins)) {
       setText(this.coinsText, s.coins);
       this.coins.classList.remove('bump');

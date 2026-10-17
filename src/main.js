@@ -16,6 +16,7 @@ import { Screens } from './ui/screens.js';
 import { loadIsland } from './game/state.js';
 import { clamp } from './util/math.js';
 import * as L from './world/layout.js';
+import { getLang, setLang, t, hasThai } from './i18n/i18n.js';
 
 const params = new URLSearchParams(location.search);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -45,6 +46,7 @@ function loadSettings() {
   const s = { ...DEFAULT_SETTINGS, ...store.get('cozycove.settings', {}) };
   if (params.get('quality')) s.quality = params.get('quality');
   if (params.has('fps')) s.showFps = true;
+  s.lang = params.get('lang') || s.lang || getLang(); // first launch: follow the iPhone's language
   return s;
 }
 
@@ -101,6 +103,7 @@ async function boot() {
     back: () => { cancelJoin = true; showTitle(); },
     audio,
     preview: (look) => setPreview(look),
+    setLang: (id) => changeLang(id),
   });
   canvas.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
@@ -122,6 +125,18 @@ async function boot() {
   if (auto === 'host' || resume?.mode === 'host') startHost();
   else if (params.get('join') || resume?.mode === 'guest') { const code = params.get('join') || resume.code; screens.connecting(code); startJoin(code); }
   else showTitle();
+}
+
+// Switch language (from the title screen or Settings). In the middle of a game we save and
+// reload, and the game jumps straight back in, so every label is rebuilt in the new language.
+function changeLang(id) {
+  settings.lang = id;
+  store.set('cozycove.settings', settings);
+  setLang(id);
+  if (game) {
+    if (game.session?.isHost) game.session.save();
+    location.reload();
+  } else showTitle();
 }
 
 function showTitle() {
