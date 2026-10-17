@@ -215,6 +215,11 @@ export async function buildWorld(scene, onProgress = () => {}) {
   onProgress(0.75, t('Filling the sea…'));
   await nextFrame();
   const propMat = makePropMaterial();
+  // The same paint, once more for objects drawn in batches (InstancedMesh) and once for batches with
+  // their own colours (the garden soil). The graphics chip needs a slightly different recipe for
+  // each kind; sharing one material made three.js swap recipes for every batch, every frame.
+  const propMatInst = makePropMaterial();
+  const propMatInstColor = makePropMaterial();
   const outlineMat = makeOutlineMaterial();
   const terrainMat = makeTerrainMaterial();
   const root = new THREE.Group();
@@ -340,7 +345,7 @@ export async function buildWorld(scene, onProgress = () => {}) {
   walk.addSurface('bridgeGap', null);
 
   const world = {
-    scene, root, terrain, mask, walk, atlas, propMat, outlineMat,
+    scene, root, terrain, mask, walk, atlas, propMat, propMatInst, propMatInstColor, outlineMat,
     plots, bushes, palms: ctx.palms, perches: ctx.perches, shop, board, fire, lighthouse: lh,
     lipX, sea, pond, fall,
     dyn: { crystal, bridgeRepair, bridgeBroken, boat, logs, picnic, gardenExpansion, glows, lhIndex, festStart, festEnd, bridgeGap: bridgeInfo.gapSurface },

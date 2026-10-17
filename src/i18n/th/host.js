@@ -57,4 +57,5 @@ export default {
   'Connection lost.': 'การเชื่อมต่อหลุดแล้ว',
   'Reconnecting…': 'กำลังเชื่อมต่อใหม่…',
   'The island didn’t answer. Try again.': 'เกาะไม่ตอบกลับมาเลย ลองใหม่อีกทีนะ',
+  'Lots of coconuts are on the ground already. Pick those up first!': 'มีมะพร้าวตกอยู่บนพื้นเยอะแล้ว เก็บพวกนั้นก่อนนะ!',
 };

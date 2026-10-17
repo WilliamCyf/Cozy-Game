@@ -38,7 +38,8 @@
    try once more by itself, then offer a button. Written in both languages. */
 function __bootFail(){try{if(!sessionStorage.getItem('cozycove.bootRetry')){sessionStorage.setItem('cozycove.bootRetry','1');location.reload();return}}catch(e){}
 var m=document.getElementById('boot-msg');if(m){m.innerHTML='Couldn\u2019t load the game · โหลดเกมไม่ได้<br><button type="button" class="boot-retry" onclick="location.reload()">Tap to try again · แตะเพื่อลองใหม่</button>'}}
-setTimeout(function(){var b=document.getElementById('boot');if(b&&!b.classList.contains('hide')&&!window.__booted)__bootFail()},30000);
+/* 30 seconds of loading while the app is on screen (time in the background, when the phone pauses it, doesn't count) */
+(function(){var n=0,iv=setInterval(function(){if(window.__booted){clearInterval(iv);return}if(document.hidden)return;if(++n>=30){clearInterval(iv);var b=document.getElementById('boot');if(b&&!b.classList.contains('hide'))__bootFail()}},1000)})();
 </script>
 <script type="module" src="%APP%" onerror="__bootFail()"></script>
 </body>

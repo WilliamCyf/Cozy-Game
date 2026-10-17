@@ -38,6 +38,7 @@ export class Session extends Emitter {
     this.myPos = null;
     this.connected = false;
     this.ended = false;
+    this.wiped = false; // "start a brand-new island": the old island must never be saved again
   }
 
   // ------------------------------------------------------------------ host
@@ -56,7 +57,7 @@ export class Session extends Emitter {
     this.flush();
     this.emit('state');
     this.emit('players');
-    saveIsland(this.state);
+    this.save();
     this.startHeartbeat();
   }
 
@@ -67,19 +68,22 @@ export class Session extends Emitter {
     this.transport.start();
   }
 
-  // Another island happens to use our code: pick a fresh one (family already here stay connected).
+  // Another island happens to use our code: pick a fresh one. The family here are told the new
+  // code first; their connection then restarts and their phones reconnect with the new code by themselves.
   changeCode() {
     if (this.changingCode || this.ended) return;
     this.changingCode = true;
     const old = this.transport;
+    this.emitOps([['set', ['code'], makeIslandCode()]]);
+    this.flush();
+    this.save();
     setTimeout(() => {
       try { old.stop(); } catch { /* ignore */ }
-      this.emitOps([['set', ['code'], makeIslandCode()]]);
-      this.save();
+      if (this.ended) return;
       this.startTransport();
       this.changingCode = false;
       this.emit('codechanged', this.state.code);
-    }, 300);
+    }, 600);
   }
 
   // Host only: send someone home (they can come back later).
@@ -100,6 +104,7 @@ export class Session extends Emitter {
     // a link that never says hello is closed after a while
     const helloTimer = setTimeout(() => { if (!pid) link.close(); }, 30000);
     link.onMessage((m) => {
+      if (link.closed) return; // e.g. someone just sent home: nothing more from them counts
       if (m.k === 'hello') {
         clearTimeout(helloTimer);
         if (m.v !== PROTOCOL) {
@@ -125,8 +130,9 @@ export class Session extends Emitter {
         pid = id;
         link.pid = pid;
         this.links.add(link);
-        this.online.set(pid, { name: String(m.name || 'Friend').slice(0, 14), look: m.look || {}, s: m.s || null, t: performance.now() });
         this.logic.a_hello(pid, { name: m.name, look: m.look });
+        const rec = this.state.players[pid]; // (the rules cleaned up the name and look)
+        this.online.set(pid, { name: rec.name, look: rec.look, s: m.s || null, t: performance.now() });
         this.flush();
         link.send({ k: 'welcome', v: PROTOCOL, state: this.state, you: pid, online: this.onlineList() });
         this.broadcast({ k: 'online', online: this.onlineList() }, link);
@@ -196,7 +202,9 @@ export class Session extends Emitter {
   async join(code) {
     this.role = 'guest';
     this.code = code;
-    const link = await joinHost(code, 22000);
+    this.joinAbort = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const link = await joinHost(code, 22000, this.joinAbort?.signal);
+    if (this.ended) { link.close(); throw new Error('cancelled'); } // Cancel was tapped: never say hello
     return new Promise((resolve, reject) => {
       let welcomed = false;
       const t = setTimeout(() => { if (!welcomed) { link.close(); reject(new Error('no welcome')); } }, 9000);
@@ -221,6 +229,7 @@ export class Session extends Emitter {
           clearTimeout(t);
           this.kicked = m;
           reject(Object.assign(new Error(m.msg), { kick: m }));
+          link.close(); // hang up too (after the reason was passed on), so nothing is left open
           return;
         }
         if (!welcomed) return;
@@ -240,6 +249,7 @@ export class Session extends Emitter {
       case 'ev':
         applyOps(this.state, m.ops);
         this.emit('ops', m.ops);
+        if (m.ops.some((op) => op[1][0] === 'code')) this.emit('codechanged', this.state.code); // (remember it for reconnecting)
         break;
       case 'fx':
         for (const f of m.list) this.emit('fx', f);
@@ -273,6 +283,7 @@ export class Session extends Emitter {
       }
       case 'kick':
         this.kicked = m;
+        this.link?.close(); // leave at once: the message shows right away and nothing more is sent
         break;
       default:
     }
@@ -283,6 +294,12 @@ export class Session extends Emitter {
     for (const w of this.waiting.values()) { clearTimeout(w.t); w.resolve({ ok: false, msg: 'Connection lost.' }); }
     this.waiting.clear();
     this.emit('lost');
+  }
+
+  // Tapped Cancel while still joining: stop that try completely (it will never say hello).
+  cancel() {
+    this.ended = true;
+    this.joinAbort?.abort();
   }
 
   // Try to get back onto the island after a hiccup (e.g. the host's phone went to sleep).
@@ -339,12 +356,14 @@ export class Session extends Emitter {
       // network timing uses the real clock (not the frame rate), so a slow frame never starves it
       if (now - this.snapT >= SNAP_MS) {
         this.snapT = now;
-        const me = this.online.get(this.pid);
-        if (me) { me.s = this.posProvider?.() || null; me.t = now; }
-        const p = {};
-        for (const [pid, o] of this.online) if (o.s) p[pid] = o.s;
         this.flush();
-        this.broadcast({ k: 'snap', tm: +this.state.time.toFixed(3), w: this.state.weather, p, ...(this.snapExtra?.() || {}) });
+        if (this.links.size) { // (playing alone: nobody to tell, so don't build the message at all)
+          const me = this.online.get(this.pid);
+          if (me) { me.s = this.posProvider?.() || null; me.t = now; }
+          const p = {};
+          for (const [pid, o] of this.online) if (o.s) p[pid] = o.s;
+          this.broadcast({ k: 'snap', tm: +this.state.time.toFixed(3), w: this.state.weather, p, ...(this.snapExtra?.() || {}) });
+        }
       } else this.flush();
       this.saveT += dt;
       if (this.saveT > 12 && this.dirty) this.save();
@@ -365,10 +384,11 @@ export class Session extends Emitter {
   }
 
   save() {
-    if (this.role !== 'host' || !this.state) return;
+    if (this.role !== 'host' || !this.state || this.wiped) return;
     this.saveT = 0;
     this.dirty = false;
-    saveIsland(this.state);
+    // the phone refused to save (storage full or switched off): say so once, so it's not a surprise later
+    if (!saveIsland(this.state) && !this.saveWarned) { this.saveWarned = true; this.emit('savefail'); }
   }
 
   // Host comes back from the background: make sure the matchmakers know we're here.
@@ -389,7 +409,7 @@ export class Session extends Emitter {
     }
   }
 
-  get code() { return this._code || this.state?.code; }
+  get code() { return this.state?.code || this._code; } // (the island's code can change: the ledger knows the latest)
   set code(v) { this._code = v; }
   get isHost() { return this.role === 'host'; }
 }

@@ -5,7 +5,7 @@ import { formatClock, timeIcon } from '../game/daynight.js';
 import { FS } from '../game/fishing.js';
 import { BAITS, FISH_BY_ID, RARITY, ITEMS, JOURNAL_FISH } from '../game/data.js';
 import { fishSVG } from './fishart.js';
-import { t, tr, hasThai } from '../i18n/i18n.js';
+import { t, tr, N_, hasThai } from '../i18n/i18n.js';
 import { canSpeak, speak, stopSpeaking } from '../audio/speech.js';
 
 // Text handed over by other parts of the game (button labels, fishing hints, messages) may be a T()
@@ -17,6 +17,8 @@ function say(x) {
   return t(x);
 }
 const initial = (name) => firstLetter(name).toUpperCase(); // for the family dots
+// what the big button says while fishing (one table made once, not a new one every frame)
+const FISH_LABEL = [null, N_('Let go!'), '…', N_('Reel in'), N_('Hook it!'), N_('Reel!'), N_('Yay!')];
 
 export class UI {
   constructor(root, game) {
@@ -127,7 +129,7 @@ export class UI {
     if (fs !== FS.NONE) {
       kind = 'fish';
       ic = '🎣';
-      label = { [FS.CHARGE]: 'Let go!', [FS.FLY]: '…', [FS.WAIT]: 'Reel in', [FS.BITE]: 'Hook it!', [FS.REEL]: g.fishing.mg.pulling ? 'Wait…' : 'Reel!', [FS.LANDED]: 'Yay!' }[fs];
+      label = fs === FS.REEL && g.fishing.mg.pulling ? 'Wait…' : FISH_LABEL[fs];
       if (fs === FS.BITE) ic = '❗';
     } else {
       const tg = g.interact.current;
@@ -145,7 +147,8 @@ export class UI {
     // bait selector shows when you could fish
     const showBait = (kind === 'fish' && fs <= FS.WAIT);
     this.baitBtn.classList.toggle('hidden', !showBait);
-    if (showBait) {
+    if (showBait && g.fishing.bait !== this._baitId) { // only when the bait changes
+      this._baitId = g.fishing.bait;
       const b = BAITS.find((x) => x.id === g.fishing.bait) || BAITS[0];
       setText(this.baitBtn.firstChild, b.emoji);
       setText(this.baitBtn.lastChild, t(b.name));
@@ -177,7 +180,8 @@ export class UI {
 
   // The language changed: rewrite every label on screen in the new language, right away.
   relabel() {
-    this._day = null; this._clockKey = null; this._actLabel = null; this._reelHint = null; this._hintIn = null; this._hint = null;
+    this._day = null; this._clockKey = null; this._actLabel = null; this._reelHint = null; this._hintIn = null; this._hint = null; this._baitId = null;
+    this.closeCatch?.(); // (a catch card was written in the old language)
     // messages already on screen were written in the old language: let them fade away now
     for (const el of this.toasts) { el.classList.remove('in'); el.classList.add('out'); setTimeout(() => el.remove(), 400); }
     this.toasts = [];
@@ -244,7 +248,9 @@ export class UI {
   }
 
   // ------------------------------------------------------------------ sheets (pop-up panels)
-  openSheet({ title, icon = '', build, onClose, cls = '' }) {
+  // keep: true (or a function saying "right now") for pages where the player types or drags something:
+  // news from the island (a fish caught by someone else…) then doesn't redraw the page under their finger.
+  openSheet({ title, icon = '', build, onClose, cls = '', keep = false }) {
     this.closeSheet(true);
     this.toggleEmotes(false);
     const body = h('div', { class: 'sheet-body' });
@@ -259,7 +265,7 @@ export class UI {
     back.addEventListener('pointerdown', (e) => { if (e.target === back) close(); });
     back.appendChild(panel);
     this.root.appendChild(back);
-    this.sheet = { back, body, onClose, refresh: () => { setText(titleEl, titleText()); const y = body.scrollTop; body.innerHTML = ''; build(body, close); body.scrollTop = y; } };
+    this.sheet = { back, body, onClose, keep, refresh: () => { setText(titleEl, titleText()); const y = body.scrollTop; body.innerHTML = ''; build(body, close); body.scrollTop = y; } };
     build(body, close);
     requestAnimationFrame(() => back.classList.add('in'));
     this.game.audio.ui('open');

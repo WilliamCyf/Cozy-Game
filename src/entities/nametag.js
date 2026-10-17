@@ -1,6 +1,7 @@
 // Floating name label above each family member (drawn once into a little picture).
 import * as THREE from 'three';
 import { CANVAS_FONT, hasThai } from '../i18n/i18n.js';
+import { shortText } from '../util/text.js';
 
 export function makeNameTag(name, color) {
   const cv = document.createElement('canvas');
@@ -9,7 +10,7 @@ export function makeNameTag(name, color) {
   cv.height = H;
   const g = cv.getContext('2d');
   const font = `600 34px ${CANVAS_FONT}`;
-  const text = shorten(name, 12);
+  const text = shortText(name, 12);
   const draw = () => {
     g.clearRect(0, 0, W, H);
     g.font = font;
@@ -25,7 +26,7 @@ export function makeNameTag(name, color) {
     g.fillStyle = '#5a3d2b';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(text, W / 2, 37);
+    g.fillText(text, W / 2, 37, W - 44); // (a long name is squeezed to fit inside the tag)
   };
   draw();
   const tex = new THREE.CanvasTexture(cv);
@@ -42,18 +43,6 @@ export function makeNameTag(name, color) {
   s.renderOrder = 50;
   s.userData.dispose = () => { tex.dispose(); mat.dispose(); };
   return s;
-}
-
-// Keep at most n letters. Thai tone marks and vowels sit on top of / under a letter and must stay
-// with it, so count whole letters ("graphemes") when the phone can, not single characters.
-function shorten(s, n) {
-  const str = String(s || '');
-  if (str.length <= n) return str;
-  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
-    const parts = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(str), (x) => x.segment);
-    return parts.slice(0, n).join('');
-  }
-  return str.slice(0, n);
 }
 
 function roundRect(g, x, y, w, h, r) {

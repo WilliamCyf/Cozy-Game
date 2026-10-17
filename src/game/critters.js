@@ -74,7 +74,7 @@ export class Critters {
       cb.add(box(0.025, 0.08, 0.025), M(sx * 0.07, 0.24, 0.12), dark, { recv: 1, outline: false });
       cb.add(blob(0.03, 0, 0, 3), M(sx * 0.07, 0.29, 0.12), hex('#222222'), { recv: 1, outline: false });
     }
-    this.crabMesh = new THREE.InstancedMesh(cb.toGeometry(), world.propMat, CRAB_N);
+    this.crabMesh = new THREE.InstancedMesh(cb.toGeometry(), world.propMatInst, CRAB_N);
     this.crabMesh.frustumCulled = false;
     scene.add(this.crabMesh);
     this.crabs = [];
@@ -95,8 +95,8 @@ export class Critters {
     gb.add(box(0.12, 0.04, 0.2), M(0, 0.32, -0.25), hex('#9aa3ad'), { recv: 0.5, outline: false });
     wb.add(box(0.5, 0.03, 0.22), M(0.27, 0, 0), hex('#c5ccd4'), { recv: 0.5, outline: false });
     wb.add(box(0.5, 0.03, 0.22), M(-0.27, 0, 0), hex('#c5ccd4'), { recv: 0.5, outline: false });
-    this.gullMesh = new THREE.InstancedMesh(gb.toGeometry(), world.propMat, GULL_N);
-    this.wingMesh = new THREE.InstancedMesh(wb.toGeometry(), world.propMat, GULL_N * 2);
+    this.gullMesh = new THREE.InstancedMesh(gb.toGeometry(), world.propMatInst, GULL_N);
+    this.wingMesh = new THREE.InstancedMesh(wb.toGeometry(), world.propMatInst, GULL_N * 2);
     this.gullMesh.frustumCulled = this.wingMesh.frustumCulled = false;
     scene.add(this.gullMesh, this.wingMesh);
     this.perches = world.perches.concat([[-46, world.terrain.heightAt(-46, -42) + 1.3, -42], [-26, world.terrain.heightAt(-26, 27) + 0.8, 27], [53, world.terrain.heightAt(53, -32) + 1.2, -32]]);
@@ -122,7 +122,7 @@ export class Critters {
     cat.add(cylinder(0.04, 0.06, 0.45, 6), M(0, 0.32, -0.32, 0, -0.9), fur, { recv: 1 });
     const catGroup = new THREE.Group();
     for (const m of cat.build(world.propMat, world.outlineMat)) catGroup.add(m);
-    scene.add(catGroup);
+    world.root.add(catGroup); // (inside the island group, so Battery saver can switch its outline off)
     this.cat = { obj: catGroup, x: L.COTTAGE.x + 5, z: L.COTTAGE.z - 5.5, h: 0, tx: 0, tz: 0, anim: 0, follow: null, followT: 0, wait: 2, rx: 0, rz: 0, rh: 0, ranim: 0, seen: false };
     this.cat.tx = this.cat.x; this.cat.tz = this.cat.z;
 
@@ -143,7 +143,7 @@ export class Critters {
     const [kx, kz] = world.shop.keeper;
     turtle.position.set(kx, world.shop.y + 0.05, kz);
     turtle.rotation.y = L.SHOP.rot;
-    scene.add(turtle);
+    world.root.add(turtle);
     this.turtle = turtle;
     this.turtleBase = turtle.position.y;
 
@@ -185,14 +185,19 @@ export class Critters {
     const walk = this.ctx.world.walk;
     const night = this.ctx.night || 0;
     c.followT -= dt;
-    let target = null;
+    // (plain numbers and a plain loop: this runs every frame, so it makes no new lists)
+    let target = false;
     if (c.follow && c.followT > 0) {
-      const p = players.find((q) => q.pid === c.follow);
-      if (p) target = [p.x - Math.sin(p.char.heading) * 1.3, p.z - Math.cos(p.char.heading) * 1.3];
+      for (let i = 0; i < players.length; i++) {
+        const p = players[i];
+        if (p.pid !== c.follow) continue;
+        c.tx = p.x - Math.sin(p.char.heading) * 1.3; c.tz = p.z - Math.cos(p.char.heading) * 1.3;
+        target = true;
+        break;
+      }
     } else c.follow = null;
-    if (!target && night > 0.7) target = [L.CAMPFIRE.x + 1.6, L.CAMPFIRE.z + 1.6];
-    if (target) { c.tx = target[0]; c.tz = target[1]; }
-    else {
+    if (!target && night > 0.7) { c.tx = L.CAMPFIRE.x + 1.6; c.tz = L.CAMPFIRE.z + 1.6; target = true; }
+    if (!target) {
       c.wait -= dt;
       if (c.wait <= 0 && Math.hypot(c.tx - c.x, c.tz - c.z) < 0.3) {
         c.wait = 3 + Math.random() * 6;
@@ -343,7 +348,7 @@ export class Critters {
       m.compose(p.set(g.x, g.y, g.z), q, s.setScalar(1));
       this.gullMesh.setMatrixAt(i, m);
       const flap = g.fly > 0 ? Math.sin(g.flap) * 0.7 : 0.0;
-      for (const side of [0, 1]) {
+      for (let side = 0; side < 2; side++) {
         e.set(0, g.h, (side ? 1 : -1) * flap, 'YXZ');
         q.setFromEuler(e);
         m.compose(p.set(g.x, g.y + 0.36, g.z), q, s.set(side ? 1 : -1, 1, 1).multiplyScalar(g.fly > 0 ? 1 : 0.6));

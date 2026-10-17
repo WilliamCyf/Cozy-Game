@@ -94,6 +94,7 @@ async function boot() {
   spawns = computeSpawnPoints(world.terrain, world.walk);
   progress(0.97, t('Waking up the crabs…'));
   audio = new Audio();
+  audio.setVolumes(settings.music, settings.sfx); // (music switched off in Settings stays off on the title screen too)
   input = new Input(canvas, uiRoot);
   titleDay = new DayNight(R.renderer);
   screens = new Screens(uiRoot, {
@@ -102,7 +103,7 @@ async function boot() {
     ownedHats: () => loadIsland()?.hats || [],
     onHost: () => startHost(),
     onJoin: (code) => startJoin(code),
-    back: () => { cancelStart(); showTitle(); },
+    back: () => { cancelStart(); if (!game) showTitle(); },
     audio,
     preview: (look) => setPreview(look),
     setLang: (id) => changeLang(id),
@@ -155,13 +156,15 @@ function changeLang(id) {
 window.__changeLang = changeLang; // used by the Settings panel and the menu
 
 function showTitle() {
-  if (updateWaiting && !game) { applyUpdate(); return; } // a new version arrived while on another screen
+  if (game) return; // (a late tap from the title screen while the game is starting)
+  if (updateWaiting) { applyUpdate(); return; } // a new version arrived while on another screen
   const saved = loadIsland();
   screens.title(saved ? { day: saved.day, fish: Object.keys(saved.journal || {}).length, name: saved.name } : null);
 }
 
 // A character standing on the deck so you can see your look on the title screen
 function setPreview(look) {
+  if (game) return;
   if (!look) { previewChar?.setVisible(false); return; }
   if (!previewChar) previewChar = new Character(look, scene);
   else previewChar.setLook(look);
@@ -189,27 +192,36 @@ function startGame(session) {
 // Only ever ONE game at a time, however many times a button is tapped. Each start gets a ticket
 // number (like at a deli counter); a join that finishes late, after Cancel or after another start,
 // sees its ticket is out of date and quietly stops.
-let ticket = 0, joining = false;
+let ticket = 0, joining = false, pendingJoin = null;
 function startHost() {
   if (game) return;
-  ticket++; joining = false;
+  cancelStart();
   const session = makeSession();
   session.startHost();
   startGame(session);
+  navigator.storage?.persist?.().catch(() => {}); // ask the phone to keep the island safe when space runs low
 }
-function cancelStart() { ticket++; joining = false; }
+function cancelStart() {
+  ticket++; joining = false;
+  pendingJoin?.cancel(); // a join still on its way stops (and never says hello to the host)
+  pendingJoin = null;
+  if (!game) { try { sessionStorage.removeItem('cozycove.resume'); } catch { /* ignore */ } } // (no jumping back in after a reload)
+}
 async function startJoin(code) {
   if (game || joining) return;
   joining = true;
   const mine = ++ticket;
   const session = makeSession();
+  pendingJoin = session;
   try {
     await session.join(code);
+    if (pendingJoin === session) pendingJoin = null;
     if (params.has('debug') && window.__slowJoin) await new Promise((r) => setTimeout(r, window.__slowJoin)); // (tests only: a slow phone)
     if (mine !== ticket || game) { session.leave(); return; }
     joining = false;
     startGame(session);
   } catch (e) {
+    if (pendingJoin === session) pendingJoin = null;
     if (mine !== ticket || game) return;
     joining = false;
     try { sessionStorage.removeItem('cozycove.resume'); } catch { /* ignore */ }
@@ -223,6 +235,11 @@ async function startJoin(code) {
 // ---------------------------------------------------------------- the loop
 let last = performance.now();
 let titleT = 0;
+// the title screen draws slower when nobody has touched it for half a minute (cooler phone)
+let titleTouch = performance.now();
+const touched = () => { titleTouch = performance.now(); };
+addEventListener('pointerdown', touched, { capture: true, passive: true });
+addEventListener('keydown', touched, { capture: true, passive: true });
 // ?perf: measure how many milliseconds each frame's work takes (game logic vs. preparing the drawing)
 const perf = params.has('perf') ? { n: 0, update: 0, render: 0, maxUpdate: 0 } : null;
 if (perf) window.__perf = perf;
@@ -246,6 +263,7 @@ function loop(now) {
       // title screen: drift the camera gently over the island
       titleT += dt;
       U.uTime.value = titleT % 1000;
+      R.state.idleFps = now - titleTouch > 30000 ? 12 : 0;
       titleDay.update(dt, 9.2, false);
       if (previewChar?.mesh.visible) {
         previewChar.update(dt);
@@ -290,9 +308,12 @@ function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   if (location.protocol !== 'https:' && location.hostname !== 'localhost') return;
   if (params.has('nosw')) return;
-  const hadCopy = !!navigator.serviceWorker.controller; // no copy yet = very first visit, nothing to update
+  let hadCopy = !!navigator.serviceWorker.controller; // no copy yet = very first visit, nothing to update
   navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => { swReg = reg; }).catch(() => {});
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadCopy) newVersionReady(); });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadCopy) newVersionReady();
+    hadCopy = true; // (the first visit's own copy has arrived: the NEXT change is a real update)
+  });
   // iPhones keep the app paused in the background instead of restarting it, so look for a new
   // version every time the game comes back on screen (one tiny file, at most once a minute)
   document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });

@@ -9,6 +9,11 @@ export const FLAG = { BLOCKED: 0, GROUND: 1, SHALLOW: 2, WOOD: 3 };
 function ellipseField(x, z, e) {
   return 1 - Math.sqrt(((x - e.x) / e.rx) ** 2 + ((z - e.z) / e.rz) ** 2);
 }
+function nearRiver(x, z) {
+  const p = L.RIVER.pts;
+  for (let i = 0; i < p.length - 1; i++) if (distToSegment(x, z, p[i][0], p[i][1], p[i + 1][0], p[i + 1][1]) < L.RIVER.width) return true;
+  return false;
+}
 
 export function buildWalkGrid(terrain, ctx) {
   const { N, CELL, H } = terrain;
@@ -101,11 +106,15 @@ export function buildWalkGrid(terrain, ctx) {
     },
     waterLevelAt,
     // Is there fishable water at (x, z)? Returns the water depth, or 0 if not water.
+    // Up on the forest hill only the pond and the river count: the hill's rocky slopes are below
+    // the pond's water level too, but they are rock, not water.
     waterDepth(x, z) {
       const k = idx(x, z);
       if (flags[k] === 3) return 0;
       const h = terrain.heightAt(x, z);
-      return Math.max(0, waterLevelAt(x, z, h) - h);
+      const lvl = waterLevelAt(x, z, h);
+      if (lvl === L.POND_LEVEL && ellipseField(x, z, L.POND) < -0.15 && !nearRiver(x, z)) return 0;
+      return Math.max(0, lvl - h);
     },
     addBlocker(name, col) {
       dynBlockers.set(name, col);

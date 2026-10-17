@@ -6,6 +6,9 @@ import { U } from '../render/materials.js';
 const MAX = 420;
 const SPRITE = { dot: 0, heart: 1, star: 2, ring: 3, leaf: 4, note: 5, rain: 6, puff: 7 };
 
+// default colours, made once (a default written inside the brackets would make a new list on every call)
+const GOLD = [1, 0.95, 0.6], LEAF = [0.45, 0.75, 0.3];
+
 export class FX {
   constructor(scene, atlas, camera, uiRoot) {
     this.camera = camera;
@@ -101,7 +104,7 @@ export class FX {
       this.spawn(x, y + 0.08, z, (Math.random() - 0.5) * 0.4, 0.4, (Math.random() - 0.5) * 0.4, 0.55, 0.35, SPRITE.puff, 0.96, 0.92, 0.82, 0.45, 0, 0.6);
     }
   }
-  sparkle(x, y, z, n = 10, color = [1, 0.95, 0.6]) {
+  sparkle(x, y, z, n = 10, color = GOLD) {
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2, s = 0.6 + Math.random() * 1.2;
       this.spawn(x, y + 0.4 + Math.random() * 0.6, z, Math.cos(a) * s, 1 + Math.random() * 1.5, Math.sin(a) * s, 0.9 + Math.random() * 0.4, 0.28 + Math.random() * 0.15, SPRITE.star, color[0], color[1], color[2], 1, 1.5);
@@ -117,7 +120,7 @@ export class FX {
       this.spawn(x + (Math.random() - 0.5) * 0.5, y + 1.8, z + (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.8, 0.9, (Math.random() - 0.5) * 0.8, 1.3, 0.38, SPRITE.note, 0.55, 0.45, 0.9, 1, -0.2);
     }
   }
-  leaves(x, y, z, n = 8, color = [0.45, 0.75, 0.3]) {
+  leaves(x, y, z, n = 8, color = LEAF) {
     for (let i = 0; i < n; i++) {
       this.spawn(x + (Math.random() - 0.5) * 2, y, z + (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 1.5, 0.3 + Math.random(), (Math.random() - 0.5) * 1.5, 1.6, 0.3, SPRITE.leaf, color[0], color[1], color[2], 1, 1.2);
     }

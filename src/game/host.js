@@ -6,6 +6,7 @@ import { PICNIC } from '../world/layout.js';
 import { SPAWN_RULES, DIG_SPOT } from './spawns.js';
 import { HATS } from '../entities/character.js';
 import { mulberry32, weightedPick } from '../util/math.js';
+import { cleanName, shortText } from '../util/text.js';
 import { T, DEFAULT_ISLAND_NAME } from '../i18n/i18n.js';
 
 // How fast the clock runs: daytime hours are slow and relaxed, nights pass quickly.
@@ -14,6 +15,14 @@ export function hourRate(h) {
 }
 
 const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+
+// A look sent by a phone: only the known parts, as short text (so nothing odd can reach the drawing code)
+const LOOK_KEYS = ['skin', 'shirt', 'accent', 'hair', 'hat'];
+function cleanLook(l) {
+  const out = {};
+  for (const k of LOOK_KEYS) if (typeof l?.[k] === 'string' && l[k].length <= 24) out[k] = l[k];
+  return out;
+}
 
 export class HostLogic {
   constructor(session, world, spawns) {
@@ -151,7 +160,7 @@ export class HostLogic {
 
   a_rename(pid, req) {
     if (pid !== this.session.pid) return { ok: false, msg: 'Only the host can rename the island.' };
-    const name = String(req.name || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    const name = shortText(String(req.name || '').slice(0, 96), 24);
     if (!name) return { ok: false };
     this.ops([['set', ['name'], name]]);
     this.feed(T('🏝️ The island is now called “{name}”!', { name: name === DEFAULT_ISLAND_NAME ? T(name) : name }));
@@ -210,7 +219,7 @@ export class HostLogic {
 
   a_hello(pid, req) {
     const prev = this.s.players[pid];
-    const rec = { name: String(req.name || 'Friend').slice(0, 14), look: req.look || {}, caught: prev?.caught || 0, joined: prev?.joined || Date.now() };
+    const rec = { name: cleanName(req.name), look: cleanLook(req.look), caught: prev?.caught || 0, joined: prev?.joined || Date.now() };
     this.ops([['set', ['players', pid], rec]]);
     if (!prev) this.feed(T('🏝️ {name} moved onto the island!', { name: rec.name }));
   }
@@ -218,9 +227,16 @@ export class HostLogic {
   a_look(pid, req) {
     const prev = this.s.players[pid];
     if (!prev) return { ok: false };
-    const hat = req.look?.hat;
-    if (hat && !this.s.hats.includes(hat)) return { ok: false, msg: 'That hat isn’t unlocked yet.' };
-    this.ops([['set', ['players', pid, 'look'], req.look], ['set', ['players', pid, 'name'], String(req.name || prev.name).slice(0, 14)]]);
+    const look = cleanLook(req.look);
+    // a hat must be unlocked on this island (the one you arrived wearing is fine too)
+    if (look.hat && !this.s.hats.includes(look.hat) && look.hat !== prev.look?.hat) return { ok: false, msg: 'That hat isn’t unlocked yet.' };
+    const name = cleanName(req.name || prev.name);
+    this.ops([['set', ['players', pid, 'look'], look], ['set', ['players', pid, 'name'], name]]);
+    // everyone draws family members from the list of who is online: update it and tell every phone
+    const o = this.session.online.get(pid);
+    if (o) { o.look = look; o.name = name; }
+    this.session.broadcast({ k: 'online', online: this.session.onlineList() });
+    this.session.emit('players');
   }
 
   a_pick(pid, req) {
@@ -236,6 +252,10 @@ export class HostLogic {
     if (!p || !info) return { ok: false };
     this.fx({ kind: 'shake', i: req.i, pid });
     if (!p.ready) return { ok: true, empty: true, msg: 'No coconuts yet… try again later.' };
+    // lots of coconuts already lying around? pick those up first (so they can't pile up forever)
+    let dropped = 0;
+    for (const it of Object.values(this.s.items)) if (it.c === 'drop') dropped++;
+    if (dropped >= 12) return { ok: true, empty: true, msg: 'Lots of coconuts are on the ground already. Pick those up first!' };
     const a = Math.random() * Math.PI * 2;
     const x = +(info.top[0] + Math.cos(a) * 1.2).toFixed(2), z = +(info.top[2] + Math.sin(a) * 1.2).toFixed(2);
     const [wx, wz] = this.world.walk.nearestWalkable(x, z, 4);

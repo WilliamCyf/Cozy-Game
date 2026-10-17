@@ -56,7 +56,9 @@ export class Screens {
         tapButton({ class: 'btn primary big', ontap: () => { c.audio.unlock(); this.ensureProfile(() => c.onHost()); } }, h('span', {}, t('🏝️ Play on our island')), h('small', {}, sub)),
         tapButton({ class: 'btn big', ontap: () => { c.audio.unlock(); this.ensureProfile(() => this.join()); } }, h('span', {}, t('🤝 Join family')), h('small', {}, t('Visit someone else’s island'))),
         prof.name ? tapButton({ class: 'btn ghost', ontap: () => this.profile(false, () => this.title(summary)) }, t('👕 {name}’s look', { name: prof.name })) : null),
-      !standalone && isIOS ? h('div', { class: 'install' }, h('b', {}, t('Make it an app! ')), t('Tap '), h('span', { class: 'share-ic' }, '⬆︎'), t(' Share, then '), h('b', {}, t('“Add to Home Screen”')), isThai() ? null : '.') : null, // Thai sentences have no full stop
+      !standalone && isIOS ? h('div', { class: 'install' }, h('b', {}, t('Make it an app! ')), t('Tap '), h('span', { class: 'share-ic' }, '⬆︎'), t(' Share, then '), h('b', {}, t('“Add to Home Screen”')), isThai() ? null : '.',
+        // the iPhone keeps a Home Screen app's things apart from Safari's: say so before anyone thinks the island was lost
+        summary ? h('small', { class: 'install-note' }, t('The Home Screen app gets its own island, separate from this one in Safari.')) : null) : null, // Thai sentences have no full stop
       h('div', { class: 'title-foot' }, t('Up to 4 players · best on the same Wi-Fi'), h('small', { class: 'ver' }, t('Version: {when}', { when: versionText() }))));
     this.mount(el, 'title');
   }

@@ -100,4 +100,5 @@ export default {
   // ---------------------------------------------------------------- starting up (src/main.js)
   'Waking up the crabs…': 'กำลังปลุกน้องปู…',
   'Oh no — this phone couldn’t start the 3D graphics. Try closing other apps and opening Cozy Cove again.': 'แย่จัง — มือถือเครื่องนี้เปิดภาพ 3 มิติไม่ได้ ลองปิดแอปอื่นๆ แล้วเปิดเกมนี้ใหม่อีกครั้งนะ',
+  'The Home Screen app gets its own island, separate from this one in Safari.': 'แอปบนหน้าจอโฮมจะมีเกาะของตัวเอง แยกจากเกาะนี้ในซาฟารี',
 };

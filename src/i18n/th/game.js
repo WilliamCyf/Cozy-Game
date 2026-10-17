@@ -91,4 +91,9 @@ export default {
 
   // ---- the speed readout (Settings → Show speed)
   '{fps} fps · {calls} draws · {tris}k tris · {dpr}x': '{fps} เฟรม/วินาที · วาด {calls} ครั้ง · {tris} พันสามเหลี่ยม · ×{dpr}',
+
+  // ---- safety messages (saving, a second window, fishing)
+  'The fish slipped away… try again!': 'ปลาหลุดไปแล้ว… ลองใหม่นะ!',
+  'This phone is out of space, so the island couldn’t be saved. Free up some space on the iPhone.': 'ที่ในมือถือเต็มแล้ว เลยบันทึกเกาะไม่ได้ ลองลบรูปหรือแอปที่ไม่ใช้ในไอโฟนออกบ้างนะ',
+  'Cozy Cove was opened in another window, so this one stopped (nothing is lost). You can close this one.': 'มีการเปิด Cozy Cove อีกหน้าต่างหนึ่ง หน้าต่างนี้เลยหยุดไว้ก่อน (ไม่มีอะไรหายนะ) ปิดหน้าต่างนี้ได้เลย',
 };

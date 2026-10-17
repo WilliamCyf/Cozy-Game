@@ -68,7 +68,7 @@ export const CROPS = {
 export const ITEMS = {
   shell: { name: 'Scallop Shell', emoji: '🐚', value: 6, kind: 'forage' },
   starfish: { name: 'Starfish', emoji: '⭐', value: 10, kind: 'forage' },
-  coral: { name: 'Coral Bit', emoji: '🪸', value: 14, kind: 'forage' },
+  coral: { name: 'Coral Bit', emoji: '🌺', value: 14, kind: 'forage' },
   driftwood: { name: 'Driftwood', emoji: '🪵', value: 4, kind: 'material' },
   seaglass: { name: 'Sea Glass', emoji: '💎', value: 25, kind: 'material' },
   coconut: { name: 'Coconut', emoji: '🥥', value: 12, kind: 'food' },

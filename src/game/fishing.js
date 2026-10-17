@@ -5,7 +5,7 @@ import { MeshBuilder, blob, box, cylinder, prism, M, hex } from '../render/geo.j
 import { FISH, FISH_BY_ID, RARITY, HOOK_EXTRAS } from './data.js';
 import { clamp, lerp, weightedPick } from '../util/math.js';
 import { POND_LEVEL, ISLET_CENTER } from '../world/layout.js';
-import { t } from '../i18n/i18n.js';
+import { t, tr } from '../i18n/i18n.js';
 
 export const FS = { NONE: 0, CHARGE: 1, FLY: 2, WAIT: 3, BITE: 4, REEL: 5, LANDED: 6 };
 const MAXLINES = 4;
@@ -57,7 +57,7 @@ export class Fishing {
     bb.add(blob(0.11, 1, 0, 1, 1), M(0, 0, 0), hex('#ffffff'), { recv: 0, outline: false });
     bb.add(blob(0.115, 1, 0, 2, 0.6), M(0, 0.04, 0), hex('#e8473a'), { recv: 0, outline: false });
     bb.add(box(0.025, 0.14, 0.025), M(0, 0.15, 0), hex('#e8473a'), { recv: 0, outline: false });
-    this.bobbers = new THREE.InstancedMesh(bb.toGeometry(), ctx.world.propMat, MAXLINES);
+    this.bobbers = new THREE.InstancedMesh(bb.toGeometry(), ctx.world.propMatInst, MAXLINES);
     this.bobbers.frustumCulled = false;
     this.bobbers.count = 0;
     this.bobbers.renderOrder = 21;
@@ -102,7 +102,8 @@ export class Fishing {
     const walk = this.ctx.world.walk;
     if (walk.waterLevelAt(x, z) === POND_LEVEL) return 'pond';
     const di = Math.hypot(x - ISLET_CENTER.x, z - ISLET_CENTER.z);
-    if (di > 7 && di < 13.5) return 'reef';
+    // reef fish live around Turtle Islet: they only bite once the bridge there is mended
+    if (di > 7 && di < 13.5 && this.ctx.session.state.projects.bridge?.done) return 'reef';
     return walk.waterDepth(x, z) > 2.3 ? 'deep' : 'shore';
   }
 
@@ -256,6 +257,11 @@ export class Fishing {
     L.char.play('cheer');
     this.ctx.critters?.release(true);
     const res = await this.ctx.session.request({ a: 'catch', fish: f.fish, extra: f.extra, size, bait: this.bait });
+    if (!res?.ok) { // the island never got it (the connection dropped): don't pretend it's in the basket
+      this.ctx.ui?.toast(tr(res?.msg) || t('The fish slipped away… try again!'), '🐟', 2400);
+      this.stop();
+      return;
+    }
     this.ctx.ui?.showCatch({ ...f, size, res, by: 'me' });
     if (['shrimp', 'lure'].includes(this.bait) && (this.ctx.session.state.basket[this.bait] || 0) <= 0) this.bait = 'worm';
   }
@@ -421,7 +427,8 @@ export class Fishing {
       // a sagging line from the rod tip to the bobber
       const sag = fs === FS.REEL ? 0.15 : 0.6;
       for (let i = 0; i < SEG; i++) {
-        for (const k of [i / SEG, (i + 1) / SEG]) {
+        for (let s = 0; s < 2; s++) { // (the two ends of each little piece; no new arrays every frame)
+          const k = (i + s) / SEG;
           pos[v * 3] = lerp(tip.x, bx, k);
           pos[v * 3 + 1] = lerp(tip.y, by + 0.05, k) - Math.sin(k * Math.PI) * sag;
           pos[v * 3 + 2] = lerp(tip.z, bz, k);
@@ -432,7 +439,8 @@ export class Fishing {
       n++;
     }
     this.bobbers.count = n;
-    this.bobbers.instanceMatrix.needsUpdate = true;
+    this.bobbers.visible = n > 0; // nobody fishing: nothing to draw (and nothing to send to the graphics chip)
+    if (n) this.bobbers.instanceMatrix.needsUpdate = true;
     this.lines.geometry.setDrawRange(0, v);
     this.lines.visible = v > 0;
     if (v) {

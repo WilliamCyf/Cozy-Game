@@ -17,6 +17,8 @@ import { SAVE_KEY } from './state.js';
 import { t, tr, islandName, CANVAS_FONT } from '../i18n/i18n.js';
 
 const EMOTE_ICON = { wave: '👋', heart: '❤️', dance: '💃', cheer: '🎉', sit: '🪑', sleep: '💤', laugh: '😄' };
+// island news that can change what an open page shows (the page is then redrawn)
+const SHEET_NEWS = new Set(['basket', 'coins', 'projects', 'journal', 'hats', 'request', 'stickers', 'name']);
 
 export class Game {
   constructor(o) {
@@ -55,10 +57,24 @@ export class Game {
     session.on('snap', () => { if (session.lastSnapMsg?.cat) this.critters.setRemoteCat(session.lastSnapMsg.cat); });
     session.on('netstatus', () => this.ui.renderFamily());
     session.on('codechanged', (code) => {
-      this.ui.toast(t('Another island was using our code, so we got a new one: {code}', { code }), '🔑', 6000);
-      try { sessionStorage.setItem('cozycove.resume', JSON.stringify({ mode: 'host', code })); } catch { /* ignore */ }
+      if (session.isHost) this.ui.toast(t('Another island was using our code, so we got a new one: {code}', { code }), '🔑', 6000);
+      // remember the new code, so coming back after an update finds the island again (host and guests)
+      try { sessionStorage.setItem('cozycove.resume', JSON.stringify({ mode: session.role, code })); } catch { /* ignore */ }
     });
+    session.on('savefail', () => this.ui.toast(t('This phone is out of space, so the island couldn’t be saved. Free up some space on the iPhone.'), '💾', 7000));
     session.on('lost', () => this.onLost());
+    // The island opened in a second window (another Safari tab)? Then this window stops saving at once,
+    // so the two windows never overwrite each other's progress.
+    if (session.isHost) {
+      addEventListener('storage', (e) => {
+        if (e.key !== SAVE_KEY && e.key !== null) return;
+        if (this.leaving || session.wiped) return;
+        session.wiped = true;
+        this.leaving = true;
+        session.leave();
+        this.ui.showOverlay(`<div class="big-emoji">🪟</div><p>${escapeHTML(t('Cozy Cove was opened in another window, so this one stopped (nothing is lost). You can close this one.'))}</p>`, [[t('Back to menu'), () => this.backToMenu(), 'primary']]);
+      });
+    }
     if (session.isHost) session.snapExtra = () => ({ cat: this.critters.catState() });
     session.posProvider = () => this.players.packet();
 
@@ -85,7 +101,8 @@ export class Game {
         this.ui.toast(msg.replace(/^\S+\s/, ''), msg.split(' ')[0], 3600);
       }
     }
-    if (this.ui.sheet && ops.some((op) => ['basket', 'coins', 'projects', 'journal', 'hats', 'request', 'stickers', 'name'].includes(op[1][0]))) {
+    const sh = this.ui.sheet;
+    if (sh && !(typeof sh.keep === 'function' ? sh.keep() : sh.keep) && ops.some((op) => SHEET_NEWS.has(op[1][0]))) {
       clearTimeout(this._refreshT);
       this._refreshT = setTimeout(() => this.ui.refreshSheet(), 120);
     }
@@ -277,15 +294,22 @@ export class Game {
   applyPreview(look) { this.players.setLocalLook(look); }
   previewLook(on) {
     this._zoomBefore ??= this.rig.zoom;
-    if (on) { this._zoomBefore = this.rig.zoom; this.rig.setZoom(1.6); }
-    else { this.rig.setZoom(this._zoomBefore || 1); this.players.setLocalLook(this.profile.look); }
+    if (on) {
+      this._zoomBefore = this.rig.zoom; this.rig.setZoom(1.6);
+      // the page covers the bottom of the screen (or the right side, phone sideways):
+      // slide the view so you stand in the open part and can see your new clothes
+      const wide = innerWidth > innerHeight;
+      this.rig.offset.set(wide ? 4.2 : 0, wide ? 0 : 5.6);
+    } else { this.rig.setZoom(this._zoomBefore || 1); this.rig.offset.set(0, 0); this.players.setLocalLook(this.profile.look); }
   }
   saveProfile(p) {
     this.profile = p;
     this.session.profile = p;
     this.saveProfileFn(p);
     this.players.setLocalLook(p.look);
-    this.session.request({ a: 'look', look: p.look, name: p.name });
+    this.session.request({ a: 'look', look: p.look, name: p.name }).then((res) => {
+      if (res && !res.ok && res.msg) { this.ui.toast(tr(res.msg), '🙈', 2400); this.audio.ui('error'); }
+    });
     const me = this.session.online.get(this.session.pid);
     if (me) { me.look = p.look; me.name = p.name; }
     this.ui.renderFamily();
@@ -420,6 +444,7 @@ export class Game {
   }
   resetIsland() {
     this.leaving = true;
+    this.session.wiped = true; // leaving normally saves the island one last time: not this one
     this.session.leave();
     try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(SAVE_KEY + '.bak'); } catch { /* ignore */ }
     setTimeout(() => location.reload(), 500);
@@ -487,6 +512,8 @@ export class Game {
     }
 
     // save power: if nobody has touched the screen for a while, slow down the frame rate
+    // (a thumb held down on the stick, or on the big button, counts as touching)
+    if (this.input.move.mag > 0 || this.actionHeld) this.lastTouch = now;
     const idle = performance.now() - this.lastTouch > 40000 && !this.fishing.active;
     this.R.state.idleFps = this.ui.sheet ? 24 : idle ? 20 : 0;
 

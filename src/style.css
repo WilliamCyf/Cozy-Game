@@ -134,10 +134,12 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 .net-dot.ok { background: var(--green); }
 /* most iPhones are 375-393 px wide: slim the top bar so clock, 4 faces, coins and menu all fit */
 @media (max-width: 400px) {
-  .top, .top-right { gap: 5px; }
-  .chip { padding: 4px 9px 4px 6px; gap: 4px; }
+  .top { gap: 4px; padding-left: calc(var(--safe-l) + 6px); padding-right: calc(var(--safe-r) + 6px); }
+  .top-right { gap: 5px; }
+  .chip { padding: 4px 7px 4px 5px; gap: 3px; }
   .chip .ic { font-size: 18px; }
-  .face + .face { margin-left: -10px; }
+  .family { padding: 3px 4px; }
+  .face + .face { margin-left: -12px; }
   .top .round { width: 40px; height: 40px; }
 }
 
@@ -158,6 +160,7 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 .act-ic { font-size: 40px; line-height: 1; margin-top: 4px; }
 .act-label {
   position: absolute; bottom: -14px; left: 50%; transform: translateX(-50%);
+  transform: translateX(min(-50%, calc(56px - 100%))); /* centred, but a long label never runs off the screen edge */
   white-space: nowrap; background: var(--paper); border: 3px solid var(--line); border-radius: 14px;
   padding: 2px 10px; font-size: 14px; font-weight: 600;
 }
@@ -181,7 +184,7 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 .bait-name { font-size: 12px; font-weight: 600; }
 .emotes { position: absolute; bottom: 180px; right: 0; display: flex; gap: 6px; background: var(--cream); border: 3px solid var(--line); border-radius: 26px; padding: 6px; box-shadow: 0 4px 0 rgba(90, 61, 43, 0.2); }
 .emote { width: 46px; height: 46px; border-radius: 50%; font-size: 26px; background: var(--paper); }
-.toasts { position: absolute; left: 50%; top: calc(var(--safe-t) + 104px); transform: translateX(-50%); width: min(92vw, 420px); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.toasts { position: absolute; left: 50%; top: calc(var(--safe-t) + 104px); transform: translateX(-50%); width: min(92vw, 420px); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; z-index: 22; } /* above open pages */
 .toast {
   display: flex; gap: 8px; align-items: center;
   background: var(--paper); border: 3px solid var(--line); border-radius: 18px;
@@ -195,7 +198,7 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 .toast.out { opacity: 0; transform: translateY(-8px); }
 .toast.solo { position: absolute; left: 50%; top: calc(var(--safe-t) + 20px); transform: translateX(-50%); z-index: 50; }
 /* centred with margin auto (a transform would be replaced by the bob animation); long tips wrap */
-.hint { position: absolute; left: 0; right: 0; margin: 0 auto; width: max-content; max-width: min(92vw, 380px); top: calc(var(--safe-t) + 60px); background: rgba(90, 61, 43, 0.82); color: #fff; padding: 8px 16px; border-radius: 18px; font-weight: 600; font-size: 15px; line-height: 1.3; text-align: center; animation: bob 2.4s ease-in-out infinite; pointer-events: none; }
+.hint { position: absolute; left: 0; right: 0; margin: 0 auto; width: max-content; max-width: min(92vw, 380px); top: calc(var(--safe-t) + 60px); background: rgba(90, 61, 43, 0.82); color: #fff; padding: 8px 16px; border-radius: 18px; font-weight: 600; font-size: 15px; line-height: 1.3; text-align: center; animation: bob 2.4s ease-in-out 4; pointer-events: none; } /* bobs a few times, then rests (an endless animation keeps the phone busy) */
 .stick-base { position: absolute; left: 0; top: 0; width: 108px; height: 108px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.7); background: rgba(255, 255, 255, 0.18); opacity: 0; transition: opacity 0.15s; pointer-events: none !important; }
 .stick-base.on { opacity: 1; }
 .stick-knob { position: absolute; left: 30px; top: 30px; width: 48px; height: 48px; border-radius: 50%; background: rgba(255, 248, 232, 0.95); border: 3px solid var(--line2); }
@@ -395,7 +398,7 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 /* ------------------------------------------------ screens */
 .screen { position: absolute; inset: 0; z-index: 25; display: flex; flex-direction: column; align-items: center; opacity: 0; transition: opacity 0.3s ease; padding: calc(var(--safe-t) + 16px) calc(var(--safe-r) + 18px) calc(var(--safe-b) + 16px) calc(var(--safe-l) + 18px); }
 .screen.in { opacity: 1; }
-.screen:not(.in) { pointer-events: none; } /* a screen fading away can't be tapped (no double starts) */
+#ui > .screen:not(.in), #ui > .sheet-back:not(.in) { pointer-events: none; } /* a screen fading away can't be tapped (no double starts) */
 .screen.title { justify-content: space-between; background: linear-gradient(to bottom, rgba(255, 248, 232, 0) 40%, rgba(255, 248, 232, 0.35) 100%); }
 .logo { margin-top: 6vh; text-align: center; position: relative; }
 .logo-sun { width: 76px; height: 76px; margin: 0 auto -18px; border-radius: 50%; background: #ffd66b; box-shadow: 0 0 0 10px rgba(255, 214, 107, 0.35); animation: bob 3s ease-in-out infinite; }
@@ -418,6 +421,7 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 .boot-retry { margin-top: 12px; padding: 10px 18px; border-radius: 16px; border: 3px solid #e2c9a0; background: #fffdf6; color: #5a3d2b; font: inherit; font-weight: 600; }
 .title-foot { font-size: 13px; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); font-weight: 600; }
 .install { width: min(88vw, 360px); background: var(--paper); border: 3px solid var(--orange); border-radius: 16px; padding: 8px 12px; font-size: 14px; text-align: center; margin-bottom: 10px; }
+.install-note { display: block; margin-top: 4px; font-size: 12px; color: var(--ink2); }
 .share-ic { display: inline-block; border: 2px solid var(--ink2); border-radius: 6px; padding: 0 5px; font-weight: 700; }
 .screen.join, .screen.profile { justify-content: center; background: rgba(40, 30, 20, 0.25); }
 .screen.profile { justify-content: flex-end; background: transparent; }
@@ -436,6 +440,9 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
   .emotes { bottom: 150px; }
   .sheet { max-height: 92%; max-width: 620px; }
   .sheet.tall, .sheet.look { max-height: 94%; }
+  .sheet.look { max-width: 54%; margin-left: auto; } /* to the right, so you can see yourself on the left */
+  .catch-card { max-height: 94vh; overflow-y: auto; }
+  .card-art { width: 48%; }
   .toasts { top: calc(var(--safe-t) + 92px); }
   .hint { top: calc(var(--safe-t) + 52px); }
   .logo { margin-top: 2vh; }

@@ -358,8 +358,9 @@ export function letterPanel(g, letter) {
 
 // ---------------------------------------------------------------- family & invite
 export function familyPanel(g) {
+  let renaming = false; // typing a new island name (the page is not redrawn meanwhile)
   g.ui.openSheet({
-    title: () => t('Family & Invite'), icon: '👨‍👩‍👧‍👦',
+    title: () => t('Family & Invite'), icon: '👨‍👩‍👧‍👦', keep: () => renaming,
     build: (b) => {
       const S = g.session;
       const code = S.code || '';
@@ -367,13 +368,27 @@ export function familyPanel(g) {
       const sc = splitCode(code);
       b.append(h('div', { class: 'code-box' }, h('div', { class: 'island-name' }, '🏝️ ', islandName(S.state.name)), h('small', {}, S.isHost ? t('Our island code') : t('Island code')),
         h('div', { class: 'code' }, sc?.pic ? h('span', { class: 'code-pic' }, sc.pic) : null, sc ? h('span', {}, sc.word, ' ', h('b', {}, sc.num)) : code)));
-      if (S.isHost) {
-        b.append(h('div', { class: 'row' }, btn(t('✏️ Name our island'), async () => {
-          const shown = islandName(S.state.name);
-          const name = prompt(t('What should your island be called?'), shown);
-          // left as the (translated) default name: keep the island's real name, like before
-          if (name && name.trim()) { await ask(g, { a: 'rename', name: name === shown ? (S.state.name || 'Cozy Cove') : name }); g.ui.refreshSheet(); }
+      if (S.isHost && !renaming) {
+        b.append(h('div', { class: 'row' }, btn(t('✏️ Name our island'), () => {
+          renaming = true;
+          g.ui.refreshSheet();
+          b.querySelector('.rename-input')?.focus();
         }, 'small ghost')));
+      } else if (S.isHost) {
+        // typed right here on the page (a phone pop-up box would pause the game for everyone while it is open)
+        const shown = islandName(S.state.name);
+        const inp = h('input', { class: 'name-input rename-input', maxlength: 40, value: shown, autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'done' });
+        const done = async (save) => {
+          if (!renaming) return;
+          renaming = false;
+          const name = inp.value.trim();
+          // left as the (translated) default name: keep the island's real name
+          if (save && name && name !== shown) await ask(g, { a: 'rename', name });
+          if (g.ui.sheet?.body === b) g.ui.refreshSheet();
+        };
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') done(true); });
+        b.append(h('label', { class: 'field' }, h('span', {}, t('What should your island be called?')), inp));
+        b.append(h('div', { class: 'row' }, btn(t('Cancel'), () => done(false), 'small ghost'), btn(t('Save'), () => done(true), 'small primary')));
       }
       if (S.isHost) {
         const st = S.transport?.status() || {};
@@ -399,7 +414,7 @@ export function familyPanel(g) {
 export function lookPanel(g) {
   g.previewLook(true);
   g.ui.openSheet({
-    title: () => t('My Look'), icon: '👕', cls: 'look',
+    title: () => t('My Look'), icon: '👕', cls: 'look', keep: true,
     onClose: () => g.previewLook(false),
     build: (b, close) => {
       b.append(buildLookEditor({
@@ -416,7 +431,7 @@ export function lookPanel(g) {
 // ---------------------------------------------------------------- settings
 export function settingsPanel(g) {
   g.ui.openSheet({
-    title: () => t('Settings'), icon: '⚙️', cls: 'tall',
+    title: () => t('Settings'), icon: '⚙️', cls: 'tall', keep: true,
     build: (b) => {
       const st = g.settings;
       // language: each button shows its own name ("🇹🇭 ภาษาไทย"), so anyone can find theirs

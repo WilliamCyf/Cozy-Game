@@ -36,6 +36,7 @@ export function createRenderer(canvas) {
     onResize: null,
     paused: false,
     idleFps: 0,
+    lastRaf: 0, rafGap: 1000 / 60, // how often the phone offers to draw (30 times a second in Low Power Mode)
   };
 
   function applySize() {
@@ -61,18 +62,24 @@ export function createRenderer(canvas) {
   // Called every animation frame by the browser. Returns true if we should draw now.
   function shouldRender(now) {
     if (state.paused) return false;
+    const gap = now - state.lastRaf;
+    state.lastRaf = now;
+    if (gap > 4 && gap < 100) state.rafGap += (gap - state.rafGap) * 0.05;
     const fps = state.idleFps || state.preset.fps;
     const interval = 1000 / fps;
     const since = now - state.lastRender;
+    // the soonest a frame can really come: the phone only offers frames every rafGap ms, so asking for
+    // 60 fps in Low Power Mode (or 24 fps on a 30 Hz rhythm) is not the phone "struggling"
+    const expected = Math.max(interval, Math.ceil((interval - 4) / state.rafGap) * state.rafGap);
     // small tolerance so a 60 Hz screen gives a steady "every other frame" rhythm
     if (since < interval - 4) return false;
     // Move the "last drawn" clock forward in whole steps so the rhythm stays even.
     if (since > interval * 3) state.lastRender = now;
     else state.lastRender += interval * Math.max(1, Math.floor((since + 4) / interval));
     // Adaptive resolution: if frames keep arriving late, draw fewer pixels.
-    if (since > interval * 1.45 && since < 400) state.slowFrames++;
+    if (since > expected * 1.45 && since < 400) state.slowFrames++;
     else state.slowFrames = Math.max(0, state.slowFrames - 0.25);
-    if (since < interval * 1.15) state.fastFrames++;
+    if (since < expected * 1.15) state.fastFrames++;
     else state.fastFrames = 0;
     if (state.slowFrames > fps * 2.5) {
       state.slowFrames = 0;

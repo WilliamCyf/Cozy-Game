@@ -49,9 +49,12 @@ export function newWorldState({ code, plots, bushes, palms }) {
 export function migrate(saved, fresh) {
   if (!saved || typeof saved !== 'object') return fresh;
   const out = { ...fresh, ...saved };
-  for (const k of ['basket', 'journal', 'items', 'players', 'mail', 'treasure', 'stats']) {
+  for (const k of ['journal', 'items', 'players', 'mail', 'treasure', 'stats']) {
     out[k] = { ...fresh[k], ...(saved[k] || {}) };
   }
+  // The basket is NOT topped up with the starting seeds: an item that was used up is simply gone
+  // (an empty slot is removed from the basket, so filling gaps would hand out free seeds every time).
+  out.basket = saved.basket && typeof saved.basket === 'object' ? { ...saved.basket } : { ...fresh.basket };
   out.projects = { ...fresh.projects };
   for (const id of Object.keys(fresh.projects)) {
     if (saved.projects?.[id]) out.projects[id] = { ...fresh.projects[id], ...saved.projects[id] };

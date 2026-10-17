@@ -35,6 +35,13 @@ function trysteroConfig(code) {
   return c;
 }
 const usePeer = !params.has('nopeer');
+// Leaving a Trystero room takes a moment; joining the same room again before that finishes gets the
+// old, closing room back. So a new join waits until the last room has really been left.
+let roomLeaving = Promise.resolve();
+function leaveRoom(room) {
+  roomLeaving = Promise.resolve().then(() => room.leave()).catch(() => {});
+  return roomLeaving;
+}
 const dbg = params.has('netdebug') ? (...a) => console.log('[dbg] net', ...a) : () => {};
 const useTry = !params.has('notry');
 
@@ -86,10 +93,12 @@ class Link {
   }
   onMessage(cb) { this.msgCb = cb; }
   onClose(cb) { this.closeCb = cb; }
-  // called by the transport when the connection drops
+  // called by the transport when the connection drops (we still let go of what we hold:
+  // a guest's own matchmaker connection or chat room, so nothing keeps running in the background)
   dropped() {
     if (this.closed) return;
     this.closed = true;
+    try { this.closeRaw(); } catch { /* already gone */ }
     this.closeCb?.();
   }
   // we hang up ourselves (still tell our listener, exactly once)
@@ -126,10 +135,13 @@ export class HostTransport {
   }
   startPeer() {
     if (this.stopped) return;
+    clearTimeout(this.retry);
+    if (this.peer && !this.peer.destroyed) return; // one matchmaker connection only (a second would fight over our name)
     try {
       const peer = new Peer(PEER_PREFIX + this.code.toLowerCase(), peerOptions());
       this.peer = peer;
-      peer.on('open', () => { this.peerOk = true; this.idTaken = 0; this.onStatus?.(); });
+      let opened = false;
+      peer.on('open', () => { opened = true; this.peerOk = true; this.idTaken = 0; this.reconnectWait = 1500; this.onStatus?.(); });
       peer.on('connection', (conn) => {
         let link = null;
         conn.on('open', () => {
@@ -141,15 +153,24 @@ export class HostTransport {
         conn.on('error', () => link?.dropped());
       });
       peer.on('disconnected', () => {
+        if (peer !== this.peer) return;
         this.peerOk = false;
         this.onStatus?.();
-        if (!peer.destroyed && !this.stopped) setTimeout(() => { try { if (!peer.destroyed) peer.reconnect(); } catch { /* ignore */ } }, 1500);
+        // only the line to the matchmaker dropped: the family's own connections keep working.
+        // Reconnect, waiting a bit longer each time it fails (so a long outage doesn't drain the battery)
+        const wait = this.reconnectWait || 1500;
+        this.reconnectWait = Math.min(wait * 2, 30000);
+        if (!peer.destroyed && !this.stopped) setTimeout(() => { try { if (!peer.destroyed && peer.disconnected) peer.reconnect(); } catch { /* ignore */ } }, wait);
       });
       peer.on('error', (e) => {
+        if (peer !== this.peer) return; // an old one we already replaced
         const t = e?.type;
         if (t === 'peer-unavailable') return; // not about us
         this.peerOk = false;
         this.onStatus?.();
+        // a hiccup on the line to the matchmaker: keep this peer (and every family member connected
+        // through it); the 'disconnected' handler above reconnects it
+        if (opened && !peer.destroyed && (t === 'network' || t === 'socket-error' || t === 'socket-closed' || t === 'disconnected')) return;
         if (t === 'unavailable-id') {
           this.idTaken++;
           // still taken after ~80 s (longer than the server's 60 s timeout for a crashed app):
@@ -218,15 +239,16 @@ export class HostTransport {
     this.stopped = true;
     clearTimeout(this.retry);
     try { this.peer?.destroy(); } catch { /* ignore */ }
-    try { this.room?.leave(); } catch { /* ignore */ }
+    try { if (this.room) leaveRoom(this.room); } catch { /* ignore */ }
     for (const l of this.tryLinks.values()) l.dropped();
     this.tryLinks.clear();
   }
 }
 
 // ------------------------------------------------------------------ joining
-// Resolves with a Link to the host, or rejects after `timeoutMs`.
-export function joinHost(code, timeoutMs = 20000) {
+// Resolves with a Link to the host, or rejects after `timeoutMs` (or when `signal` is aborted:
+// the player tapped Cancel, so everything this try opened is closed straight away).
+export function joinHost(code, timeoutMs = 20000, signal = null) {
   return new Promise((resolve, reject) => {
     let done = false;
     const cleanups = [];
@@ -239,6 +261,8 @@ export function joinHost(code, timeoutMs = 20000) {
       else resolve(link);
     };
     const timer = setTimeout(() => finish(new Error('timeout')), timeoutMs);
+    if (signal?.aborted) { finish(new Error('cancelled')); return; }
+    signal?.addEventListener('abort', () => finish(new Error('cancelled')), { once: true });
 
     if (usePeer) {
       let peer;
@@ -270,6 +294,10 @@ export function joinHost(code, timeoutMs = 20000) {
     }
 
     if (useTry) {
+      // (wait until a room we used before has really been left, or we would get that old room back)
+      roomLeaving.then(() => { if (!done) joinTrystero(); });
+    }
+    function joinTrystero() {
       try {
         const hosts = new Set();
         let link = null, hostId = null;
@@ -283,12 +311,13 @@ export function joinHost(code, timeoutMs = 20000) {
           onJoinError: (d) => dbg('guest: handshake refused', d?.error),
         });
         const act = room.makeAction('m');
-        cleanups.push({ kind: 'trystero', fn: () => { try { room.leave(); } catch { /* ignore */ } } });
+        cleanups.push({ kind: 'trystero', fn: () => { try { leaveRoom(room); } catch { /* ignore */ } } });
+        if (done) { leaveRoom(room); return; } // finished while we waited
         room.onPeerJoin = (peerId) => {
           dbg('guest: peer join', peerId, hosts.has(peerId) ? '(host)' : '');
           if (link || !hosts.has(peerId)) return;
           hostId = peerId;
-          link = new Link('trystero', (s) => act.send(s, { target: hostId }), () => { try { room.leave(); } catch { /* ignore */ } });
+          link = new Link('trystero', (s) => act.send(s, { target: hostId }), () => { try { leaveRoom(room); } catch { /* ignore */ } });
           finish(null, link, 'trystero');
         };
         act.onMessage = (data, meta) => {

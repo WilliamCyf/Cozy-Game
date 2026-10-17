@@ -16,6 +16,7 @@ export class CameraRig {
     this.target = new THREE.Vector3();
     this.smoothed = new THREE.Vector3();
     this.lookAhead = new THREE.Vector2();
+    this.offset = new THREE.Vector2(); // slide the view (My Look: you stand above the page, not behind it)
     this.shake = 0;
     this.first = true;
   }
@@ -35,7 +36,7 @@ export class CameraRig {
   update(dt, tx, ty, tz, vx = 0, vz = 0) {
     this.lookAhead.x = damp(this.lookAhead.x, vx * 0.35, 2.5, dt);
     this.lookAhead.y = damp(this.lookAhead.y, vz * 0.35, 2.5, dt);
-    this.target.set(tx + this.lookAhead.x, ty, tz + this.lookAhead.y);
+    this.target.set(tx + this.lookAhead.x + this.offset.x, ty, tz + this.lookAhead.y + this.offset.y);
     if (this.first) { this.smoothed.copy(this.target); this.first = false; }
     this.smoothed.x = damp(this.smoothed.x, this.target.x, 6, dt);
     this.smoothed.y = damp(this.smoothed.y, this.target.y, 3, dt);

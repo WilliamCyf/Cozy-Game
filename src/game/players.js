@@ -39,6 +39,7 @@ export class PlayerManager {
     this._v = new THREE.Vector3();
     this.list = []; // everyone on the island, refreshed once per frame (reused, no garbage)
     this.pool = [];
+    this.outlinesOn = true; // Battery saver turns the cartoon outlines off (for friends who arrive later too)
   }
 
   setLocalLook(look) { this.local.char.setLook(look); }
@@ -144,7 +145,7 @@ export class PlayerManager {
       if (pid === session.pid) continue;
       let r = this.remotes.get(pid);
       if (!r) {
-        r = { char: new Character(o.look || {}, scene), tag: makeNameTag(o.name || t('Friend'), o.look?.accent || '#3aa39a'), buf: [], lastS: null, x: 0, z: 0, y: 0, heading: 0, lookKey: JSON.stringify(o.look || {}), name: o.name, speed: 0, seen: false };
+        r = { char: new Character(o.look || {}, scene), tag: makeNameTag(o.name || t('Friend'), o.look?.accent || '#3aa39a'), buf: [], lastS: null, x: 0, z: 0, y: 0, heading: 0, lookKey: JSON.stringify(o.look || {}), name: o.name, accent: o.look?.accent, speed: 0, seen: false };
         scene.add(r.tag);
         r.char.setVisible(false);
         r.tag.visible = false;
@@ -152,8 +153,9 @@ export class PlayerManager {
       }
       const key = JSON.stringify(o.look || {});
       if (key !== r.lookKey) { r.lookKey = key; r.char.setLook(o.look || {}); }
-      if (o.name !== r.name) {
+      if (o.name !== r.name || o.look?.accent !== r.accent) { // the name tag shows the name in the favourite colour
         r.name = o.name;
+        r.accent = o.look?.accent;
         scene.remove(r.tag);
         r.tag.userData.dispose?.();
         r.tag = makeNameTag(o.name || t('Friend'), o.look?.accent || '#3aa39a');
@@ -190,7 +192,7 @@ export class PlayerManager {
       const k = span > 0 ? clamp((rt - a.t) / span, 0, 1) : 1;
       const tx = lerp(a.s[0], b.s[0], k), tz = lerp(a.s[1], b.s[1], k);
       const th = a.s[2] + angleDiff(a.s[2], b.s[2]) * k;
-      if (!r.seen) { r.x = tx; r.z = tz; r.heading = th; r.y = world.walk.groundY(tx, tz); r.seen = true; r.char.setVisible(true); r.tag.visible = this.ctx.settings?.nameTags !== false; }
+      if (!r.seen) { r.x = tx; r.z = tz; r.heading = th; r.y = world.walk.groundY(tx, tz); r.seen = true; r.char.setVisible(true); r.char.setOutline(this.outlinesOn); r.tag.visible = this.ctx.settings?.nameTags !== false; }
       const ox = r.x, oz = r.z;
       // big jump (teleport / reconnect) -> snap, otherwise glide
       if (Math.hypot(tx - r.x, tz - r.z) > 6) { r.x = tx; r.z = tz; }
@@ -241,6 +243,7 @@ export class PlayerManager {
     return this.remotes.get(pid)?.char || null;
   }
   setOutlines(on) {
+    this.outlinesOn = on;
     this.local.char.setOutline(on);
     for (const r of this.remotes.values()) r.char.setOutline(on);
   }

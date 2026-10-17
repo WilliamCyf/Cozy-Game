@@ -9,6 +9,9 @@ import * as L from '../world/layout.js';
 import { U } from '../render/materials.js';
 
 const ITEM_KINDS = ['shell', 'starfish', 'coral', 'driftwood', 'seaglass', 'mushroom', 'flower', 'coconut'];
+// colours used again and again while playing: made once here, not every time
+const PALE = [1, 1, 0.8];
+const FIREWORK_COLS = [[[1, 0.45, 0.5], [1, 0.85, 0.4]], [[0.5, 0.8, 1], [0.8, 0.6, 1]], [[0.5, 1, 0.6], [1, 1, 0.6]]];
 
 function itemGeometry(kind) {
   const b = new MeshBuilder();
@@ -114,7 +117,7 @@ export class WorldView {
     // ground items: one instanced mesh per kind
     this.itemMeshes = {};
     for (const k of ITEM_KINDS) {
-      const mesh = new THREE.InstancedMesh(itemGeometry(k), this.mat, 24);
+      const mesh = new THREE.InstancedMesh(itemGeometry(k), world.propMatInst, 24);
       mesh.count = 0;
       mesh.frustumCulled = false;
       scene.add(mesh);
@@ -126,7 +129,7 @@ export class WorldView {
     for (const [dx, dy, dz] of [[0, 0, 0], [0.09, 0.05, 0.05], [-0.07, 0.06, 0.06], [0.02, 0.12, -0.04]]) fruitGeo.berry.add(blob(0.07, 1, 0, 2), M(dx, dy, dz), hex('#5a6fd8'), { recv: 0.3, outline: false, sway: 0.15 });
     this.fruit = {};
     for (const k of ['orange', 'berry']) {
-      const mesh = new THREE.InstancedMesh(fruitGeo[k].toGeometry(), this.mat, 30);
+      const mesh = new THREE.InstancedMesh(fruitGeo[k].toGeometry(), world.propMatInst, 30);
       mesh.count = 0;
       mesh.frustumCulled = false;
       scene.add(mesh);
@@ -143,14 +146,14 @@ export class WorldView {
     // coconuts up in the palms
     const cocoB = new MeshBuilder();
     cocoB.add(blob(0.22, 0, 0.1, 3), M(0, 0, 0), hex('#7a5232'), { recv: 0, outline: false, sway: 1.3 });
-    this.coconuts = new THREE.InstancedMesh(cocoB.toGeometry(), this.mat, world.palms.length * 3);
+    this.coconuts = new THREE.InstancedMesh(cocoB.toGeometry(), world.propMatInst, world.palms.length * 3);
     this.coconuts.frustumCulled = false;
     scene.add(this.coconuts);
 
     // garden: soil patches (colour shows if watered) + crops
     const soilB = new MeshBuilder();
     soilB.add(box(L.GARDEN.plot - 0.1, 0.14, L.GARDEN.plot - 0.1), M(0, 0.04, 0), [1, 1, 1], { recv: 1, outline: false });
-    this.soil = new THREE.InstancedMesh(soilB.toGeometry(), this.mat, world.plots.length);
+    this.soil = new THREE.InstancedMesh(soilB.toGeometry(), world.propMatInstColor, world.plots.length);
     this.soil.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(world.plots.length * 3), 3);
     this.soil.frustumCulled = false;
     scene.add(this.soil);
@@ -366,11 +369,12 @@ export class WorldView {
     this.beam.visible = this.lighthouseOn && night > 0.05;
     if (this.beam.visible) this.beam.rotation.y += dt * 0.5;
     // flickering campfire
-    this.flames.children.forEach((f, i) => {
+    const flames = this.flames.children;
+    for (let i = 0; i < flames.length; i++) {
       const k = 0.85 + Math.sin(time * (9 + i * 3) + i) * 0.12 + Math.sin(time * 17 + i * 2) * 0.06;
-      f.scale.y = k * (i ? 0.75 : 1);
-      f.rotation.y = time * (1 + i * 0.3);
-    });
+      flames[i].scale.y = k * (i ? 0.75 : 1);
+      flames[i].rotation.y = time * (1 + i * 0.3);
+    }
     // gentle boat bob
     d.boat.position.y = 0.12 + Math.sin(time * 1.3) * 0.05;
     d.boat.rotation.z = Math.sin(time * 0.9) * 0.03;
@@ -379,22 +383,25 @@ export class WorldView {
     if (this.sparkleT <= 0) {
       this.sparkleT = 0.9;
       let best = null, bd = 18 * 18;
-      for (const it of Object.values(this.session.state.items)) {
+      const items = this.session.state.items;
+      for (const id in items) {
+        const it = items[id];
         const dd = (it.x - nearX) ** 2 + (it.z - nearZ) ** 2;
         if (dd < bd && Math.random() < 0.5) { bd = dd; best = it; }
       }
-      if (best) this.fx.sparkle(best.x, this.world.walk.groundY(best.x, best.z) - 0.3, best.z, 2, [1, 1, 0.8]);
-      this.world.plots.forEach((p, i) => {
-        const s = this.session.state.plots[i];
+      if (best) this.fx.sparkle(best.x, this.world.walk.groundY(best.x, best.z) - 0.3, best.z, 2, PALE);
+      const plots = this.world.plots;
+      for (let i = 0; i < plots.length; i++) {
+        const p = plots[i], s = this.session.state.plots[i];
         if (s?.crop && s.stage >= 3 && Math.random() < 0.3) this.fx.sparkle(p.x, this.world.terrain.heightAt(p.x, p.z), p.z, 2);
-      });
+      }
     }
     // Lantern Festival: fireworks every night!
     if (this.festival && night > 0.6) {
       this.fireworkT -= dt;
       if (this.fireworkT <= 0) {
         this.fireworkT = 1.2 + Math.random() * 1.6;
-        const cols = [[[1, 0.45, 0.5], [1, 0.85, 0.4]], [[0.5, 0.8, 1], [0.8, 0.6, 1]], [[0.5, 1, 0.6], [1, 1, 0.6]]][Math.floor(Math.random() * 3)];
+        const cols = FIREWORK_COLS[Math.floor(Math.random() * 3)];
         this.fx.burst(nearX + (Math.random() - 0.5) * 24, 14 + Math.random() * 5, nearZ - 12 - Math.random() * 10, cols);
         this.onFirework?.();
       }
