@@ -16,7 +16,7 @@ import { Screens } from './ui/screens.js';
 import { loadIsland } from './game/state.js';
 import { clamp } from './util/math.js';
 import * as L from './world/layout.js';
-import { getLang, setLang, t, hasThai } from './i18n/i18n.js';
+import { getLang, setLang, t, tr, hasThai } from './i18n/i18n.js';
 
 const params = new URLSearchParams(location.search);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -58,7 +58,7 @@ const progress = (p, msg) => {
   const fill = document.getElementById('boot-fill');
   if (fill) fill.style.width = `${Math.round(p * 100)}%`;
   const m = document.getElementById('boot-msg');
-  if (m && msg) m.textContent = msg;
+  if (m && msg) m.textContent = hasThai(msg) ? msg : t(msg); // the world builder sends English messages
 };
 
 let R, rig, scene, world, spawns, audio, input, screens, game = null, titleDay;
@@ -77,7 +77,7 @@ async function boot() {
   try {
     R = createRenderer(canvas);
   } catch (e) {
-    fatal('Oh no — this phone couldn’t start the 3D graphics. Try closing other apps and opening Cozy Cove again.');
+    fatal(t('Oh no — this phone couldn’t start the 3D graphics. Try closing other apps and opening Cozy Cove again.'));
     return;
   }
   R.setQuality(settings.quality);
@@ -90,7 +90,7 @@ async function boot() {
   R.applySize();
   world = await buildWorld(scene, progress);
   spawns = computeSpawnPoints(world.terrain, world.walk);
-  progress(0.97, 'Waking up the crabs…');
+  progress(0.97, t('Waking up the crabs…'));
   audio = new Audio();
   input = new Input(canvas, uiRoot);
   titleDay = new DayNight(R.renderer);
@@ -138,6 +138,7 @@ function changeLang(id) {
     location.reload();
   } else showTitle();
 }
+window.__changeLang = changeLang; // used by the Settings panel
 
 function showTitle() {
   const saved = loadIsland();
@@ -184,7 +185,8 @@ async function startJoin(code) {
   } catch (e) {
     if (cancelJoin) return;
     try { sessionStorage.removeItem('cozycove.resume'); } catch { /* ignore */ }
-    const msg = e?.kick?.msg || 'Couldn’t find that island. Check the code, and make sure Cozy Cove is open on the host’s phone (same Wi-Fi works best).';
+    // a "no" from the host arrives as a message object (or English text from an older host): show it in this phone's language
+    const msg = tr(e?.kick?.msg) || t('Couldn’t find that island. Check the code, and make sure Cozy Cove is open on the host’s phone (same Wi-Fi works best).');
     screens.join(code, msg);
   }
 }

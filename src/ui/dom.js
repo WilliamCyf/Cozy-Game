@@ -41,6 +41,11 @@ export function setText(el, text) {
   if (el._t !== s) { el._t = s; el.textContent = s; }
 }
 
+// First letter of a name (for the little face circles). A Thai name can start with a vowel that is
+// written before its consonant (แม่), so that vowel, the consonant and its marks stay together.
+const FIRST_LETTER = /^[\u0E40-\u0E44]?.[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]*/u;
+export const firstLetter = (name) => ((name || '?').match(FIRST_LETTER)?.[0] || '?');
+
 export function escapeHTML(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

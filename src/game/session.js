@@ -5,7 +5,9 @@ import { applyOps, newWorldState, migrate, saveIsland, loadIsland } from './stat
 import { HostLogic } from './host.js';
 import { HostTransport, joinHost, makeIslandCode } from '../net/transport.js';
 
-export const PROTOCOL = 3;
+// 4: news and replies are message objects (T() in i18n.js) that each phone shows in its own language.
+// An older game would choke on them, so it is told "different versions" instead.
+export const PROTOCOL = 4;
 const dbg = new URLSearchParams(location.search).has('netdebug') ? (...a) => console.log('[dbg] session', ...a) : () => {};
 export const MAX_PLAYERS = 4;
 const SNAP_MS = 100;
@@ -79,7 +81,9 @@ export class Session extends Emitter {
     }, 300);
   }
 
-  // Host only: send someone home (they can come back later)
+  // Host only: send someone home (they can come back later).
+  // Kick texts stay plain English sentences; the guest's phone shows them in its own language with tr().
+  // (Plain text, not T(), so an older game can still show the "different versions" one.)
   kick(pid) {
     for (const l of this.links) {
       if (l.pid === pid) {

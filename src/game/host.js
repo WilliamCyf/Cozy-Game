@@ -1,11 +1,12 @@
 // The host's rule book. Only the host phone runs this.
 // Players send requests ("I'd like to sell 3 shells"); the host checks the ledger,
 // and if it's allowed, writes the ops (journal entries) that everyone applies.
-import { CROPS, ITEMS, FISH_BY_ID, RECIPES, SHOP, PROJECTS, PROJECT_BY_ID, LETTERS, BOTTLE_NOTES, JOURNAL_FISH, RARITY, REQUESTS, STICKERS } from './data.js';
+import { CROPS, ITEMS, FISH_BY_ID, RECIPES, SHOP, PROJECTS, PROJECT_BY_ID, LETTERS, BOTTLE_NOTES, JOURNAL_FISH, REQUESTS, STICKERS } from './data.js';
 import { PICNIC } from '../world/layout.js';
 import { SPAWN_RULES, DIG_SPOT } from './spawns.js';
 import { HATS } from '../entities/character.js';
 import { mulberry32, weightedPick } from '../util/math.js';
+import { T, DEFAULT_ISLAND_NAME } from '../i18n/i18n.js';
 
 // How fast the clock runs: daytime hours are slow and relaxed, nights pass quickly.
 export function hourRate(h) {
@@ -32,8 +33,10 @@ export class HostLogic {
   get s() { return this.session.state; }
   ops(list) { this.session.emitOps(list); }
   fx(f) { this.session.emitFx(f); }
+  // News and replies travel to phones that may use another language, so they are message
+  // objects made with T() (or plain English sentences); each phone shows them in its own language with tr().
   feed(m, extra = {}) { this.ops([['push', ['feed'], { t: Date.now(), m, ...extra }, 30]]); }
-  playerName(pid) { return this.s.players[pid]?.name || 'Someone'; }
+  playerName(pid) { return this.s.players[pid]?.name || T('Someone'); }
 
   // ---------------------------------------------------------------- time passes
   tick(dt) {
@@ -101,7 +104,7 @@ export class HostLogic {
 
   newDay() {
     this.ops([['inc', ['day'], 1], ['inc', ['stats', 'days'], 1]]);
-    this.feed(`🌅 Good morning! Day ${this.s.day} on the island.`);
+    this.feed(T('🌅 Good morning! Day {n} on the island.', { n: this.s.day }));
     this.newRequest();
     this.feed('🐢 Captain Shelly has a new request at the shop!');
   }
@@ -131,7 +134,7 @@ export class HostLogic {
     if (!r || r.done) return { ok: false, msg: 'Captain Shelly has everything she needs today. Come back tomorrow!' };
     const ids = this.matching(r.item);
     const have = ids.reduce((a, id) => a + this.s.basket[id], 0);
-    if (have < r.n) return { ok: false, msg: `You need ${r.n - have} more first.` };
+    if (have < r.n) return { ok: false, msg: T('You need {n} more first.', { n: r.n - have }) };
     const ops = [];
     let left = r.n;
     for (const id of ids) {
@@ -142,7 +145,7 @@ export class HostLogic {
     ops.push(['inc', ['coins'], r.reward], ['inc', ['stats', 'earned'], r.reward], ['inc', ['stats', 'requests'], 1], ['set', ['request', 'done'], true]);
     if (r.bonus) ops.push(this.give(r.bonus, 1));
     this.ops(ops);
-    this.feed(`🐢 ${this.playerName(pid)} helped Captain Shelly! +${r.reward} coins for the family jar.`);
+    this.feed(T('🐢 {name} helped Captain Shelly! +{n} coins for the family jar.', { name: this.playerName(pid), n: r.reward }));
     return { ok: true, reward: r.reward, bonus: r.bonus };
   }
 
@@ -151,7 +154,7 @@ export class HostLogic {
     const name = String(req.name || '').replace(/\s+/g, ' ').trim().slice(0, 24);
     if (!name) return { ok: false };
     this.ops([['set', ['name'], name]]);
-    this.feed(`🏝️ The island is now called “${name}”!`);
+    this.feed(T('🏝️ The island is now called “{name}”!', { name: name === DEFAULT_ISLAND_NAME ? T(name) : name }));
     return { ok: true };
   }
 
@@ -165,7 +168,7 @@ export class HostLogic {
       try { ok = !!st.test(s, FISH_BY_ID); } catch { ok = false; }
       if (ok) {
         this.ops([['push', ['stickers'], st.id, 100]]);
-        this.feed(`🏅 New sticker for the family: ${st.emoji} ${st.name}!`);
+        this.feed(T('🏅 New sticker for the family: {e} {name}!', { e: st.emoji, name: T(st.name) }));
       }
     }
   }
@@ -209,7 +212,7 @@ export class HostLogic {
     const prev = this.s.players[pid];
     const rec = { name: String(req.name || 'Friend').slice(0, 14), look: req.look || {}, caught: prev?.caught || 0, joined: prev?.joined || Date.now() };
     this.ops([['set', ['players', pid], rec]]);
-    if (!prev) this.feed(`🏝️ ${rec.name} moved onto the island!`);
+    if (!prev) this.feed(T('🏝️ {name} moved onto the island!', { name: rec.name }));
   }
 
   a_look(pid, req) {
@@ -306,7 +309,7 @@ export class HostLogic {
     if (req.extra === 'chest') {
       const coins = randInt(90, 220);
       this.ops([...ops, ['inc', ['coins'], coins], ['inc', ['stats', 'earned'], coins]]);
-      this.feed(`🧰 ${name} fished up a treasure chest with ${coins} coins!`);
+      this.feed(T('🧰 {name} fished up a treasure chest with {coins} coins!', { name, coins }));
       return { ok: true, coins };
     }
     const f = FISH_BY_ID[req.fish];
@@ -317,7 +320,7 @@ export class HostLogic {
     const record = j && size > j.best;
     ops.push(this.give('fish:' + f.id, 1));
     if (!f.junk) {
-      ops.push(['set', ['journal', f.id], { n: (j?.n || 0) + 1, best: Math.max(size, j?.best || 0), by: j?.by || name, first: j?.first || Date.now() }]);
+      ops.push(['set', ['journal', f.id], { n: (j?.n || 0) + 1, best: Math.max(size, j?.best || 0), by: j?.by || s.players[pid]?.name || 'Someone', first: j?.first || Date.now() }]);
       ops.push(['inc', ['stats', 'fish'], 1]);
       ops.push(['inc', ['players', pid, 'caught'], 1]);
     }
@@ -325,11 +328,12 @@ export class HostLogic {
     if (isNew) this.checkProjects();
     if (isNew) {
       const total = Object.keys(this.s.journal).length;
-      this.feed(`📖 ${name} discovered the ${f.name}! (${total}/${JOURNAL_FISH.length} in the journal)`, { pid });
+      this.feed(T('📖 {name} discovered the {fish}! ({n}/{total} in the journal)', { name, fish: T(f.name), n: total, total: JOURNAL_FISH.length }), { pid });
     } else if (f.rar === 'legendary' || f.rar === 'rare') {
-      this.feed(`✨ ${name} caught a ${RARITY[f.rar].label.toLowerCase()} ${f.name}!`, { pid });
+      const p = { name, fish: T(f.name) };
+      this.feed(f.rar === 'legendary' ? T('✨ {name} caught a legendary {fish}!', p) : T('✨ {name} caught a rare {fish}!', p), { pid });
     } else if (record) {
-      this.feed(`📏 New family record: ${name}'s ${f.name} is ${size} cm!`, { pid });
+      this.feed(T("📏 New family record: {name}'s {fish} is {size} cm!", { name, fish: T(f.name), size }), { pid });
     }
     return { ok: true, isNew, record };
   }
@@ -360,7 +364,7 @@ export class HostLogic {
     if (this.s.hats.includes(hat.id)) return { ok: true };
     if (this.s.coins < hat.price) return { ok: false, msg: 'Not enough coins in the family jar.' };
     this.ops([['inc', ['coins'], -hat.price], ['set', ['hats'], [...this.s.hats, hat.id]]]);
-    this.feed(`🎩 The family unlocked the ${hat.name}!`);
+    this.feed(T('🎩 The family unlocked the {hat}!', { hat: T(hat.name) }));
     return { ok: true };
   }
 
@@ -395,7 +399,7 @@ export class HostLogic {
     const ops = Object.entries(use).map(([k, n]) => this.give(k, -n));
     ops.push(this.give(r.id, 1), ['inc', ['stats', 'dishes'], 1]);
     this.ops(ops);
-    if (r.special) { this.ops([['inc', ['stats', 'feasts'], 1]]); this.feed(`🍱 ${this.playerName(pid)} cooked a Family Feast! Everyone gather round!`); }
+    if (r.special) { this.ops([['inc', ['stats', 'feasts'], 1]]); this.feed(T('🍱 {name} cooked a Family Feast! Everyone gather round!', { name: this.playerName(pid) })); }
     this.fx({ kind: 'cook', pid, r: r.id });
     return { ok: true };
   }
@@ -460,7 +464,7 @@ export class HostLogic {
     const ops = [['set', ['projects', p.id, 'done'], true]];
     if (p.id === 'festival' && !this.s.hats.includes('crown')) ops.push(['set', ['hats'], [...this.s.hats, 'crown']]);
     this.ops(ops);
-    this.feed(`🎉 Family project complete: ${p.name}! ${p.reward}`);
+    this.feed(T('🎉 Family project complete: {name}! {reward}', { name: T(p.name), reward: T(p.reward) }));
     this.fx({ kind: 'project', id: p.id });
     // finishing one project may unlock (and already satisfy) the next
     if (p.id !== 'festival') this.checkProjects();
@@ -483,7 +487,7 @@ export class HostLogic {
     const coins = randInt(60, 140);
     const bonus = ['seaglass', 'coral', 'lure', 'seed:pumpkin'][Math.floor(Math.random() * 4)];
     this.ops([['set', ['treasure', 'day'], s.day], ['inc', ['coins'], coins], ['inc', ['stats', 'earned'], coins], ['inc', ['stats', 'treasures'], 1], this.give(bonus, 1)]);
-    this.feed(`🏴‍☠️ ${this.playerName(pid)} dug up buried treasure: ${coins} coins and a ${ITEMS[bonus].name}!`);
+    this.feed(T('🏴‍☠️ {name} dug up buried treasure: {coins} coins and a {item}!', { name: this.playerName(pid), coins, item: T(ITEMS[bonus].name) }));
     this.fx({ kind: 'pop', x: DIG_SPOT.x, z: DIG_SPOT.z, item: 'chest', pid });
     void req;
     return { ok: true, coins, bonus };
@@ -508,7 +512,7 @@ export class HostLogic {
     }
     if (n < 2) return;
     this.ops([['set', ['picnicDay'], s.day], ['inc', ['coins'], 30], ['inc', ['stats', 'picnics'], 1], ['inc', ['stats', 'earned'], 30]]);
-    this.feed(`🧺 Family picnic! ${n} of you sat together. Everyone feels cozy. +30 coins`);
+    this.feed(T('🧺 Family picnic! {n} of you sat together. Everyone feels cozy. +30 coins', { n }));
     this.fx({ kind: 'picnic', pid });
     this.checkStickers();
     this.session.flush();

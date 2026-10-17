@@ -8,6 +8,7 @@ import { makeNameTag } from '../entities/nametag.js';
 import { damp, dampAngle, angleDiff, clamp, lerp } from '../util/math.js';
 import { sampleMaskShadow } from '../render/textures.js';
 import { SPAWN } from '../world/layout.js';
+import { t } from '../i18n/i18n.js';
 
 export const ANIMS = ['idle', 'walk', 'sit', 'fish', 'cast', 'charge', 'reel', 'cheer', 'wave', 'dance', 'heart', 'shake', 'water', 'pick', 'plant', 'cook', 'sleep'];
 const ANIM_IDX = Object.fromEntries(ANIMS.map((a, i) => [a, i]));
@@ -143,7 +144,7 @@ export class PlayerManager {
       if (pid === session.pid) continue;
       let r = this.remotes.get(pid);
       if (!r) {
-        r = { char: new Character(o.look || {}, scene), tag: makeNameTag(o.name || 'Friend', o.look?.accent || '#3aa39a'), buf: [], lastS: null, x: 0, z: 0, y: 0, heading: 0, lookKey: JSON.stringify(o.look || {}), name: o.name, speed: 0, seen: false };
+        r = { char: new Character(o.look || {}, scene), tag: makeNameTag(o.name || t('Friend'), o.look?.accent || '#3aa39a'), buf: [], lastS: null, x: 0, z: 0, y: 0, heading: 0, lookKey: JSON.stringify(o.look || {}), name: o.name, speed: 0, seen: false };
         scene.add(r.tag);
         r.char.setVisible(false);
         r.tag.visible = false;
@@ -155,7 +156,7 @@ export class PlayerManager {
         r.name = o.name;
         scene.remove(r.tag);
         r.tag.userData.dispose?.();
-        r.tag = makeNameTag(o.name || 'Friend', o.look?.accent || '#3aa39a');
+        r.tag = makeNameTag(o.name || t('Friend'), o.look?.accent || '#3aa39a');
         r.tag.visible = r.seen && this.ctx.settings?.nameTags !== false;
         scene.add(r.tag);
       }

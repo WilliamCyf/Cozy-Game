@@ -9,10 +9,11 @@ import { Interact } from './interact.js';
 import { DayNight } from './daynight.js';
 import { UI } from '../ui/ui.js';
 import { PANELS, plantPanel, letterPanel, boardPanel } from '../ui/panels.js';
-import { ITEMS, CROPS, PROJECT_BY_ID } from './data.js';
+import { ITEMS, CROPS, PROJECT_BY_ID, itemName } from './data.js';
 import { U } from '../render/materials.js';
 import * as L from '../world/layout.js';
 import { SAVE_KEY } from './state.js';
+import { t, tr, islandName, CANVAS_FONT } from '../i18n/i18n.js';
 
 const EMOTE_ICON = { wave: '👋', heart: '❤️', dance: '💃', cheer: '🎉', sit: '🪑', sleep: '💤', laugh: '😄' };
 
@@ -48,12 +49,12 @@ export class Game {
     session.on('ops', (ops) => this.onOps(ops));
     session.on('fx', (f) => this.onFx(f));
     session.on('players', () => { this.players.syncRoster(); this.ui.renderFamily(); });
-    session.on('joined', (pid) => { if (pid !== session.pid) { this.ui.toast(`${session.online.get(pid)?.name || 'Someone'} arrived on the island!`, '👋', 2600); this.audio.chime(); } });
-    session.on('left', (pid) => { const n = session.state.players[pid]?.name; if (n) this.ui.toast(`${n} went home for now.`, '🏡', 2200); });
+    session.on('joined', (pid) => { if (pid !== session.pid) { this.ui.toast(t('{name} arrived on the island!', { name: session.online.get(pid)?.name || t('Someone') }), '👋', 2600); this.audio.chime(); } });
+    session.on('left', (pid) => { const n = session.state.players[pid]?.name; if (n) this.ui.toast(t('{name} went home for now.', { name: n }), '🏡', 2200); });
     session.on('snap', () => { if (session.lastSnapMsg?.cat) this.critters.setRemoteCat(session.lastSnapMsg.cat); });
     session.on('netstatus', () => this.ui.renderFamily());
     session.on('codechanged', (code) => {
-      this.ui.toast(`Another island was using our code, so we got a new one: ${code}`, '🔑', 6000);
+      this.ui.toast(t('Another island was using our code, so we got a new one: {code}', { code }), '🔑', 6000);
       try { sessionStorage.setItem('cozycove.resume', JSON.stringify({ mode: 'host', code })); } catch { /* ignore */ }
     });
     session.on('lost', () => this.onLost());
@@ -67,8 +68,8 @@ export class Game {
     // welcome
     setTimeout(() => {
       const s = session.state;
-      this.ui.toast(session.isHost ? `Welcome home, ${this.profile.name}! Day ${s.day} on Cozy Cove.` : `Welcome to the family island, ${this.profile.name}!`, '🏝️', 3200);
-      if ((s.mail?.day || 0) < s.day) setTimeout(() => this.ui.toast('There’s a letter in the mailbox by the cottage!', '✉️', 3000), 3500);
+      this.ui.toast(session.isHost ? t('Welcome home, {name}! Day {day} on {island}.', { name: this.profile.name, day: s.day, island: islandName(s.name) }) : t('Welcome to the family island, {name}!', { name: this.profile.name }), '🏝️', 3200);
+      if ((s.mail?.day || 0) < s.day) setTimeout(() => this.ui.toast(t('There’s a letter in the mailbox by the cottage!'), '✉️', 3000), 3500);
     }, 600);
   }
 
@@ -79,7 +80,8 @@ export class Game {
       if (op[0] === 'push' && op[1][0] === 'feed') {
         const e = op[2];
         if (e.pid && e.pid === this.session.pid) continue;
-        this.ui.toast(e.m.replace(/^\S+\s/, ''), e.m.split(' ')[0], 3600);
+        const msg = tr(e.m); // translate first, then split off the leading emoji as the icon
+        this.ui.toast(msg.replace(/^\S+\s/, ''), msg.split(' ')[0], 3600);
       }
     }
     if (this.ui.sheet && ops.some((op) => ['basket', 'coins', 'projects', 'journal', 'hats', 'request', 'stickers', 'name'].includes(op[1][0]))) {
@@ -142,14 +144,14 @@ export class Game {
     this.audio.fanfare();
     const P = this.players.local;
     for (let i = 0; i < 4; i++) setTimeout(() => { this.fx.burst(P.x + (Math.random() - 0.5) * 10, P.y + 7 + Math.random() * 3, P.z - 4, [[1, 0.5, 0.55], [1, 0.85, 0.4], [0.5, 0.8, 1]]); this.audio.boom(); }, i * 450);
-    this.ui.banner(p.emoji, 'Project complete!', p.name, p.reward);
+    this.ui.banner(p.emoji, t('Project complete!'), t(p.name), t(p.reward));
     if (!this.fishing.active) this.players.emote('cheer', 2.5);
   }
 
   highFive(r) {
     this.myWaveT = 0;
     this.fx.sparkle((r.x + this.players.local.x) / 2, r.y + 1, (r.z + this.players.local.z) / 2, 14, [1, 0.9, 0.5]);
-    this.fx.label((r.x + this.players.local.x) / 2, r.y + 2.2, (r.z + this.players.local.z) / 2, 'High five! 🙌', 'big');
+    this.fx.label((r.x + this.players.local.x) / 2, r.y + 2.2, (r.z + this.players.local.z) / 2, t('High five! 🙌'), 'big');
     this.audio.clap();
   }
 
@@ -182,30 +184,30 @@ export class Game {
     if (this.fishing.active) this.fishing.release();
   }
 
-  async doInteract(t) {
+  async doInteract(tg) {
     const S = this.session, P = this.players;
     const ask = async (req, anim, secs) => {
       if (anim) P.doAction(anim, secs);
-      P.faceTowards(t.x, t.z);
+      P.faceTowards(tg.x, tg.z);
       const res = await S.request(req);
-      if (!res?.ok && res?.msg) { this.ui.toast(res.msg, '🙈', 2000); this.audio.ui('error'); }
-      else if (res?.msg) this.ui.toast(res.msg, t.icon, 1800);
+      if (!res?.ok && res?.msg) { this.ui.toast(tr(res.msg), '🙈', 2000); this.audio.ui('error'); }
+      else if (res?.msg) this.ui.toast(tr(res.msg), tg.icon, 1800);
       return res;
     };
-    switch (t.type) {
-      case 'pick': ask({ a: 'pick', id: t.id }, 'pick', 0.5); break;
-      case 'bush': if (t.dim) this.ui.toast('Picked clean — fruit grows back in a little while.', '🌿', 1800); else ask({ a: 'bush', i: t.i }, 'pick', 0.5); break;
+    switch (tg.type) {
+      case 'pick': ask({ a: 'pick', id: tg.id }, 'pick', 0.5); break;
+      case 'bush': if (tg.dim) this.ui.toast(t('Picked clean — fruit grows back in a little while.'), '🌿', 1800); else ask({ a: 'bush', i: tg.i }, 'pick', 0.5); break;
       case 'shake': {
-        const res = await ask({ a: 'shake', i: t.i }, 'shake', 0.9);
+        const res = await ask({ a: 'shake', i: tg.i }, 'shake', 0.9);
         if (res?.ok && !res.empty) this.tutorial('shook');
         break;
       }
       case 'plot': {
-        const st = S.state.plots[t.i];
-        if (!st?.crop) { plantPanel(this, t.i); break; }
-        if (st.stage >= 3) { const r = await ask({ a: 'harvest', i: t.i }, 'pick', 0.6); if (r?.ok) this.audio.chime(); break; }
-        if (!st.water && S.state.weather !== 'rain') { P.faceTowards(t.x, t.z); ask({ a: 'water', i: t.i }, 'water', 1.1); break; }
-        this.ui.toast(`This ${CROPS[st.crop].name.toLowerCase()} is growing happily. Stage ${st.stage + 1} of 4.`, CROPS[st.crop].emoji, 1800);
+        const st = S.state.plots[tg.i];
+        if (!st?.crop) { plantPanel(this, tg.i); break; }
+        if (st.stage >= 3) { const r = await ask({ a: 'harvest', i: tg.i }, 'pick', 0.6); if (r?.ok) this.audio.chime(); break; }
+        if (!st.water && S.state.weather !== 'rain') { P.faceTowards(tg.x, tg.z); ask({ a: 'water', i: tg.i }, 'water', 1.1); break; }
+        this.ui.toast(t('This {crop} is growing happily. Stage {n} of 4.', { crop: t(CROPS[st.crop].name).toLowerCase(), n: st.stage + 1 }), CROPS[st.crop].emoji, 1800);
         break;
       }
       case 'board': this.openPanel('board'); this.tutorial('board'); break;
@@ -217,17 +219,17 @@ export class Game {
       case 'cook': this.openPanel('cook'); break;
       case 'mail': {
         const r = await S.request({ a: 'mail' });
-        if (r?.ok) { this.audio.letter(); letterPanel(this, r.letter); } else this.ui.toast(r?.msg || 'No mail.', '✉️', 1800);
+        if (r?.ok) { this.audio.letter(); letterPanel(this, r.letter); } else this.ui.toast(tr(r?.msg) || t('No mail.'), '✉️', 1800);
         break;
       }
       case 'dig': {
         P.doAction('pick', 1.2);
-        P.faceTowards(t.x, t.z);
+        P.faceTowards(tg.x, tg.z);
         const r = await S.request({ a: 'dig' });
-        if (r?.ok) { this.audio.fanfare(); this.ui.toast(`Treasure! +${r.coins} coins and a ${ITEMS[r.bonus].name}!`, '🏴‍☠️', 3000); } else if (r?.msg) this.ui.toast(r.msg, '⛏️', 2000);
+        if (r?.ok) { this.audio.fanfare(); this.ui.toast(t('Treasure! +{coins} coins and a {item}!', { coins: r.coins, item: itemName(r.bonus) }), '🏴‍☠️', 3000); } else if (r?.msg) this.ui.toast(tr(r.msg), '⛏️', 2000);
         break;
       }
-      case 'pet': P.faceTowards(t.x, t.z); P.emote('heart', 1.6); S.request({ a: 'pet' }); break;
+      case 'pet': P.faceTowards(tg.x, tg.z); P.emote('heart', 1.6); S.request({ a: 'pet' }); break;
       case 'friend': this.emote('wave'); break;
       case 'bench': case 'picnic': this.emote('sit'); break;
       default:
@@ -243,9 +245,9 @@ export class Game {
     if (e === 'dance') this.fx.notes(P.x, P.y, P.z, 3);
     if (e === 'wave') {
       this.myWaveT = performance.now();
-      for (const [pid, t] of this.recentWaves) {
+      for (const [pid, wt] of this.recentWaves) {
         const r = this.players.remotes.get(pid);
-        if (r && performance.now() - t < 2500 && Math.hypot(r.x - P.x, r.z - P.z) < 2.6) { this.highFive(r); break; }
+        if (r && performance.now() - wt < 2500 && Math.hypot(r.x - P.x, r.z - P.z) < 2.6) { this.highFive(r); break; }
       }
     }
     this.audio.chime();
@@ -259,7 +261,7 @@ export class Game {
     this.cooking = { r, t: r.time };
     P.doAction('cook', r.time);
     this.audio.sizzle();
-    this.ui.toast(`Cooking ${r.name}…`, '🍳', r.time * 1000);
+    this.ui.toast(t('Cooking {name}…', { name: t(r.name) }), '🍳', r.time * 1000);
   }
 
   openPanel(name, ...args) {
@@ -287,6 +289,8 @@ export class Game {
     if (me) { me.look = p.look; me.name = p.name; }
     this.ui.renderFamily();
   }
+  // switch language (the app saves and reloads, so every label is rebuilt in the new language)
+  changeLang(id) { window.__changeLang?.(id); }
   setSetting(k, v) {
     this.settings[k] = v;
     this.saveSettingsFn(this.settings);
@@ -314,11 +318,11 @@ export class Game {
     const P = this.players.local;
     if (!tut.moved) {
       if (Math.hypot(P.x - L.SPAWN.x, P.z - L.SPAWN.z) > 6) this.tutorial('moved');
-      return this.ui.hint('👆 Slide your thumb on the island to walk around');
+      return this.ui.hint(t('👆 Slide your thumb on the island to walk around'));
     }
-    if (!tut.fished) return this.ui.hint('🎣 Walk to the water and press the big button to fish');
-    if (!tut.board && this.session.state.stats.fish > 0) return this.ui.hint('📋 Visit the Family Board next to the cottage');
-    if (!tut.planted && tut.board) return this.ui.hint('🌱 Plant seeds in the garden by the cottage');
+    if (!tut.fished) return this.ui.hint(t('🎣 Walk to the water and press the big button to fish'));
+    if (!tut.board && this.session.state.stats.fish > 0) return this.ui.hint(t('📋 Visit the Family Board next to the cottage'));
+    if (!tut.planted && tut.board) return this.ui.hint(t('🌱 Plant seeds in the garden by the cottage'));
     this.ui.hint(null);
   }
 
@@ -337,9 +341,9 @@ export class Game {
     g.lineWidth = pad;
     g.strokeStyle = '#fff8e8';
     g.strokeRect(pad / 2, pad / 2, W - pad, H - pad);
-    g.font = `600 ${Math.round(pad * 1.3)}px Fredoka, ui-rounded, sans-serif`;
+    g.font = `600 ${Math.round(pad * 1.3)}px ${CANVAS_FONT}`;
     g.fillStyle = 'rgba(255,248,232,0.92)';
-    const text = `${this.session.state.name || 'Cozy Cove'} · Day ${this.session.state.day}`;
+    const text = `${islandName(this.session.state.name)} · ${t('Day {n}', { n: this.session.state.day })}`;
     const tw = g.measureText(text).width;
     g.fillRect(W - tw - pad * 3, H - pad * 3.2, tw + pad * 2, pad * 2);
     g.fillStyle = '#5a3d2b';
@@ -369,10 +373,10 @@ export class Game {
     if (this.fishing.active) this.fishing.stop();
     const kick = this.session.kicked;
     if (kick && ['closed', 'full', 'version', 'self', 'sent'].includes(kick.why)) {
-      this.ui.showOverlay(`<div class="big-emoji">🌙</div><p>${kick.msg}</p>`, [['Back to menu', () => this.backToMenu(), 'primary']]);
+      this.ui.showOverlay(`<div class="big-emoji">🌙</div><p>${tr(kick.msg)}</p>`, [[t('Back to menu'), () => this.backToMenu(), 'primary']]);
       return;
     }
-    this.ui.showOverlay('<div class="big-emoji">📡</div><p><b>Lost the connection to the island…</b></p><p class="small">Reconnecting. (Is the host’s phone awake?)</p><div class="spinner"></div>', [['Back to menu', () => this.backToMenu(), 'ghost']]);
+    this.ui.showOverlay(`<div class="big-emoji">📡</div><p><b>${t('Lost the connection to the island…')}</b></p><p class="small">${t('Reconnecting. (Is the host’s phone awake?)')}</p><div class="spinner"></div>`, [[t('Back to menu'), () => this.backToMenu(), 'ghost']]);
     this.reconnectLoop();
   }
   async reconnectLoop() {
@@ -381,7 +385,7 @@ export class Game {
       try {
         await this.session.reconnect();
         this.ui.hideOverlay();
-        this.ui.toast('Back on the island!', '🏝️', 2000);
+        this.ui.toast(t('Back on the island!'), '🏝️', 2000);
         this.players.syncRoster();
         this.ui.renderFamily();
         return;
@@ -391,7 +395,7 @@ export class Game {
       }
     }
     if (!this.session.connected && !this.leaving) {
-      this.ui.showOverlay('<div class="big-emoji">🏝️</div><p>Couldn’t reach the island. Ask the host to open Cozy Cove, then try again.</p>', [['Back to menu', () => this.backToMenu(), 'primary']]);
+      this.ui.showOverlay(`<div class="big-emoji">🏝️</div><p>${t('Couldn’t reach the island. Ask the host to open Cozy Cove, then try again.')}</p>`, [[t('Back to menu'), () => this.backToMenu(), 'primary']]);
     }
   }
 
@@ -413,16 +417,16 @@ export class Game {
     setTimeout(() => location.reload(), 500);
   }
   async checkUpdate() {
-    this.ui.toast('Checking for updates…', '🔄', 1500);
+    this.ui.toast(t('Checking for updates…'), '🔄', 1500);
     try {
       const reg = await navigator.serviceWorker?.getRegistration();
       await reg?.update();
       if (reg?.waiting || reg?.installing) {
-        this.ui.toast('Updating Cozy Cove…', '✨', 1500);
+        this.ui.toast(t('Updating Cozy Cove…'), '✨', 1500);
         if (this.session.isHost) this.session.save();
         setTimeout(() => location.reload(), 1500);
-      } else this.ui.toast('You have the newest version!', '✅', 1800);
-    } catch { this.ui.toast('Couldn’t check right now.', '🙈', 1500); }
+      } else this.ui.toast(t('You have the newest version!'), '✅', 1800);
+    } catch { this.ui.toast(t('Couldn’t check right now.'), '🙈', 1500); }
   }
 
   // ------------------------------------------------------------------ every frame
@@ -443,8 +447,8 @@ export class Game {
         const r = this.cooking.r;
         this.cooking = null;
         S.request({ a: 'cook', r: r.id }).then((res) => {
-          if (res?.ok) { this.ui.toast(`Made ${r.name}!`, r.emoji, 2200); this.audio.chime(); this.fx.label(this.players.local.x, this.players.local.y + 2, this.players.local.z, `+1 ${r.emoji}`, 'mine'); }
-          else this.ui.toast(res?.msg || 'Oops, the pot tipped over!', '🙈');
+          if (res?.ok) { this.ui.toast(t('Made {name}!', { name: t(r.name) }), r.emoji, 2200); this.audio.chime(); this.fx.label(this.players.local.x, this.players.local.y + 2, this.players.local.z, `+1 ${r.emoji}`, 'mine'); }
+          else this.ui.toast(tr(res?.msg) || t('Oops, the pot tipped over!'), '🙈');
         });
       }
     }
@@ -486,7 +490,7 @@ export class Game {
       this.fpsT += dt;
       if (this.fpsT > 1) {
         const info = this.R.renderer.info.render;
-        this.ui.setFps(`${Math.round(this.fpsN / this.fpsT)} fps · ${info.calls} draws · ${(info.triangles / 1000).toFixed(0)}k tris · ${this.R.state.dpr.toFixed(2)}x`);
+        this.ui.setFps(t('{fps} fps · {calls} draws · {tris}k tris · {dpr}x', { fps: Math.round(this.fpsN / this.fpsT), calls: info.calls, tris: (info.triangles / 1000).toFixed(0), dpr: this.R.state.dpr.toFixed(2) })); // once a second
         this.fpsN = 0; this.fpsT = 0;
       }
     }

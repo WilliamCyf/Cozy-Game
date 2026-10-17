@@ -1,11 +1,21 @@
 // The on-screen interface (HUD): clock, coins, family, the big action button, toasts,
 // pop-up sheets and the fishing meters. Text is only rewritten when it changes.
-import { h, tapButton, setText } from './dom.js';
+import { h, tapButton, setText, firstLetter } from './dom.js';
 import { formatClock, timeIcon } from '../game/daynight.js';
 import { FS } from '../game/fishing.js';
 import { BAITS, FISH_BY_ID, RARITY, ITEMS, JOURNAL_FISH } from '../game/data.js';
 import { fishSVG } from './fishart.js';
-import { t } from '../i18n/i18n.js';
+import { t, tr, hasThai } from '../i18n/i18n.js';
+
+// Text handed over by other parts of the game (button labels, fishing hints, messages) may be a T()
+// message, plain English (translated here) or already translated (left as it is).
+const LATIN = /[A-Za-z]/;
+function say(x) {
+  if (x && typeof x === 'object') return tr(x);
+  if (typeof x !== 'string' || !LATIN.test(x) || hasThai(x)) return x;
+  return t(x);
+}
+const initial = (name) => firstLetter(name).toUpperCase(); // for the family dots (keeps a Thai vowel with its consonant)
 
 export class UI {
   constructor(root, game) {
@@ -26,13 +36,13 @@ export class UI {
     const g = this.game;
     // top bar
     this.clockIcon = h('span', { class: 'ic' }, '☀️');
-    this.clockText = h('span', {}, '8:00 AM');
-    this.dayText = h('small', {}, 'Day 1');
+    this.clockText = h('span', {}, formatClock(8));
+    this.dayText = h('small', {}, t('Day {n}', { n: 1 }));
     this.clock = h('div', { class: 'chip clock' }, this.clockIcon, h('span', { class: 'col' }, this.clockText, this.dayText));
     this.coinsText = h('span', {}, '0');
     this.coins = tapButton({ class: 'chip coins', ontap: () => g.openPanel('basket') }, h('span', { class: 'ic' }, '🪙'), this.coinsText);
     this.family = tapButton({ class: 'family', ontap: () => g.openPanel('family') });
-    this.menuBtn = tapButton({ class: 'round menu', 'aria-label': 'Menu', ontap: () => g.openPanel('menu') }, h('span', {}, '☰'));
+    this.menuBtn = tapButton({ class: 'round menu', 'aria-label': t('Menu'), ontap: () => g.openPanel('menu') }, h('span', {}, '☰'));
     this.netDot = h('i', { class: 'net-dot' });
     this.hud.append(h('div', { class: 'top' }, this.clock, this.family, h('div', { class: 'top-right' }, this.coins, this.menuBtn)));
     this.toastBox = h('div', { class: 'toasts' });
@@ -42,7 +52,7 @@ export class UI {
     // bottom-right: action button + small buttons
     this.actIcon = h('span', { class: 'act-ic' }, '🎣');
     this.actLabel = h('span', { class: 'act-label' }, '');
-    this.action = h('button', { class: 'action', type: 'button', 'aria-label': 'Action' }, h('i', { class: 'ring' }), this.actIcon, this.actLabel);
+    this.action = h('button', { class: 'action', type: 'button', 'aria-label': t('Action') }, h('i', { class: 'ring' }), this.actIcon, this.actLabel);
     const down = (e) => { e.preventDefault(); e.stopPropagation(); this.action.classList.add('pressed'); g.audio.unlock(); g.actionDown(); };
     const up = (e) => { e.preventDefault(); e.stopPropagation(); this.action.classList.remove('pressed'); g.actionUp(); };
     this.action.addEventListener('pointerdown', down);
@@ -52,12 +62,12 @@ export class UI {
     this.action.addEventListener('pointerdown', (e) => { try { this.action.setPointerCapture(e.pointerId); } catch { /* fine */ } });
     window.addEventListener('keydown', (e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat && !this.modalOpen && !(e.target?.tagName === 'INPUT')) { e.preventDefault(); down(e); } });
     window.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Enter') up(e); });
-    this.emoteBtn = tapButton({ class: 'round small', 'aria-label': 'Emotes', ontap: () => this.toggleEmotes() }, '😊');
-    this.basketBtn = tapButton({ class: 'round small', 'aria-label': 'Basket', ontap: () => g.openPanel('basket') }, '🧺');
-    this.journalBtn = tapButton({ class: 'round small', 'aria-label': 'Fish journal', ontap: () => g.openPanel('journal') }, '📖');
-    this.baitBtn = tapButton({ class: 'bait hidden', ontap: () => this.cycleBait() }, h('span', { class: 'ic' }, '🪱'), h('span', { class: 'bait-name' }, 'Worm'));
+    this.emoteBtn = tapButton({ class: 'round small', 'aria-label': t('Emotes'), ontap: () => this.toggleEmotes() }, '😊');
+    this.basketBtn = tapButton({ class: 'round small', 'aria-label': t('Basket'), ontap: () => g.openPanel('basket') }, '🧺');
+    this.journalBtn = tapButton({ class: 'round small', 'aria-label': t('Fish journal'), ontap: () => g.openPanel('journal') }, '📖');
+    this.baitBtn = tapButton({ class: 'bait hidden', ontap: () => this.cycleBait() }, h('span', { class: 'ic' }, '🪱'), h('span', { class: 'bait-name' }, t('Worm')));
     this.power = h('div', { class: 'power hidden' }, h('i'));
-    this.reel = h('div', { class: 'reel hidden' }, h('div', { class: 'reel-hint' }, 'Hold to reel!'), h('div', { class: 'tension' }, h('i')));
+    this.reel = h('div', { class: 'reel hidden' }, h('div', { class: 'reel-hint' }, t('Hold to reel!')), h('div', { class: 'tension' }, h('i')));
     this.bite = h('div', { class: 'bite hidden' }, '!');
     this.emotes = h('div', { class: 'emotes hidden' },
       ...[['wave', '👋'], ['heart', '❤️'], ['dance', '💃'], ['cheer', '🎉'], ['sit', '🪑'], ['sleep', '😴']].map(([e, ic]) =>
@@ -86,8 +96,10 @@ export class UI {
     const next = avail[(i + 1) % avail.length];
     g.fishing.bait = next.id;
     g.audio.ui('tick');
-    const left = next.item ? ` (${basket[next.item]} left)` : '';
-    this.toast(`${next.name}${left}: ${next.desc}`, next.emoji, 1800);
+    const msg = next.item
+      ? t('{name} ({n} left): {desc}', { name: t(next.name), n: basket[next.item], desc: t(next.desc) })
+      : t('{name}: {desc}', { name: t(next.name), desc: t(next.desc) });
+    this.toast(msg, next.emoji, 1800);
   }
 
   // ------------------------------------------------------------------ per frame
@@ -118,15 +130,15 @@ export class UI {
       label = { [FS.CHARGE]: 'Let go!', [FS.FLY]: '…', [FS.WAIT]: 'Reel in', [FS.BITE]: 'Hook it!', [FS.REEL]: g.fishing.mg.pulling ? 'Wait…' : 'Reel!', [FS.LANDED]: 'Yay!' }[fs];
       if (fs === FS.BITE) ic = '❗';
     } else {
-      const t = g.interact.current;
-      if (t) { ic = t.icon; label = t.label; dim = !!t.dim; kind = t.type; }
+      const tg = g.interact.current;
+      if (tg) { ic = tg.icon; label = tg.label; dim = !!tg.dim; kind = tg.type; }
       else { ic = '👣'; label = 'Explore'; dim = true; kind = 'none'; }
     }
     const key = ic + '|' + label + '|' + dim;
     if (key !== this.lastAction) {
       this.lastAction = key;
       setText(this.actIcon, ic);
-      setText(this.actLabel, label);
+      setText(this.actLabel, say(label)); // translated only when the label changes
       this.action.classList.toggle('dim', dim);
       this.action.classList.toggle('alert', fs === FS.BITE);
     }
@@ -137,7 +149,7 @@ export class UI {
     if (showBait) {
       const b = BAITS.find((x) => x.id === g.fishing.bait) || BAITS[0];
       setText(this.baitBtn.firstChild, b.emoji);
-      setText(this.baitBtn.lastChild, b.name);
+      setText(this.baitBtn.lastChild, t(b.name));
     }
     // fishing meters
     this.power.classList.toggle('hidden', fs !== FS.CHARGE);
@@ -149,14 +161,14 @@ export class UI {
       const mg = g.fishing.mg;
       const p = Math.round(mg.p * 100);
       if (p !== this._p) { this._p = p; this.action.style.setProperty('--p', p + '%'); }
-      const t = Math.round(mg.tension * 100);
-      if (t !== this._tn) {
-        this._tn = t;
+      const tn = Math.round(mg.tension * 100);
+      if (tn !== this._tn) {
+        this._tn = tn;
         const bar = this.reel.lastChild.firstChild;
         bar.style.transform = `scaleX(${mg.tension.toFixed(3)})`;
         bar.style.background = mg.tension > 0.7 ? '#e8574a' : mg.tension > 0.4 ? '#f5a23a' : '#7cc95a';
       }
-      setText(this.reel.firstChild, mg.hint);
+      if (mg.hint !== this._reelHint) { this._reelHint = mg.hint; setText(this.reel.firstChild, say(mg.hint)); }
       this.reel.firstChild.classList.toggle('warn', mg.pulling);
     }
   }
@@ -176,15 +188,16 @@ export class UI {
     for (const [pid, o] of g.session.online) {
       const look = o.look || {};
       const me = pid === g.session.pid;
-      this.family.appendChild(h('span', { class: 'face' + (me ? ' me' : ''), style: { borderColor: look.accent || '#3aa39a', background: look.shirt || '#fff' } }, (o.name || '?').slice(0, 1).toUpperCase()));
+      this.family.appendChild(h('span', { class: 'face' + (me ? ' me' : ''), style: { borderColor: look.accent || '#3aa39a', background: look.shirt || '#fff' } }, initial(o.name)));
     }
     if (g.session.online.size < 4) this.family.appendChild(h('span', { class: 'face add' }, '+'));
     this.family.appendChild(this.netDot);
   }
 
   // ------------------------------------------------------------------ toasts
+  // text: finished text, or a T() message (turned into this phone's language)
   toast(text, icon = '✨', ms = 2600) {
-    const el = h('div', { class: 'toast' }, h('span', { class: 'ic' }, icon), h('span', {}, text));
+    const el = h('div', { class: 'toast' }, h('span', { class: 'ic' }, icon), h('span', {}, say(text)));
     this.toastBox.appendChild(el);
     this.toasts.push(el);
     while (this.toasts.length > 3) this.toasts.shift().remove();
@@ -197,10 +210,13 @@ export class UI {
   }
 
   hint(text) {
-    if (!text) { this.hintBox.classList.add('hidden'); this._hint = null; return; }
-    if (this._hint === text) return;
-    this._hint = text;
-    this.hintBox.textContent = text;
+    if (!text) { this.hintBox.classList.add('hidden'); this._hint = null; this._hintIn = null; return; }
+    if (this._hintIn === text) return; // called every frame: nothing to do while the hint stays the same
+    this._hintIn = text;
+    const s = say(text);
+    if (this._hint === s) return;
+    this._hint = s;
+    this.hintBox.textContent = s;
     this.hintBox.classList.remove('hidden');
   }
 
@@ -211,7 +227,7 @@ export class UI {
     const body = h('div', { class: 'sheet-body' });
     const close = () => this.closeSheet();
     const panel = h('div', { class: 'sheet ' + cls },
-      h('div', { class: 'sheet-head' }, h('div', { class: 'sheet-title' }, icon ? h('span', { class: 'ic' }, icon) : null, title), tapButton({ class: 'x', 'aria-label': 'Close', ontap: close }, '✕')),
+      h('div', { class: 'sheet-head' }, h('div', { class: 'sheet-title' }, icon ? h('span', { class: 'ic' }, icon) : null, title), tapButton({ class: 'x', 'aria-label': t('Close'), ontap: close }, '✕')),
       body);
     const back = h('div', { class: 'sheet-back' });
     back.addEventListener('pointerdown', (e) => { if (e.target === back) close(); });
@@ -241,25 +257,25 @@ export class UI {
     let art, title, sub = '', badges = [];
     if (extra === 'bottle') {
       art = h('div', { class: 'big-emoji' }, '🍾');
-      title = 'Message in a Bottle';
-      sub = res?.note || '';
+      title = t('Message in a Bottle');
+      sub = tr(res?.note);
     } else if (extra === 'chest') {
       art = h('div', { class: 'big-emoji' }, '🧰');
-      title = 'Treasure Chest!';
-      sub = `+${res?.coins || 0} coins for the family jar!`;
+      title = t('Treasure Chest!');
+      sub = t('+{n} coins for the family jar!', { n: res?.coins || 0 });
     } else if (extra === 'seaglass') {
       art = h('div', { class: 'big-emoji' }, '💎');
-      title = 'Sea Glass';
-      sub = 'Shiny! The lighthouse needs these.';
+      title = t('Sea Glass');
+      sub = t('Shiny! The lighthouse needs these.');
     } else {
       const f = FISH_BY_ID[fish];
       art = h('div', { class: 'card-art', html: fishSVG(fish) });
-      title = f.name;
+      title = t(f.name);
       const r = RARITY[f.rar];
-      sub = f.junk ? 'Hmm… not a fish. Someone lost a boot!' : `${size} cm`;
-      if (!f.junk) badges.push(h('span', { class: 'stars', style: { color: r.color } }, '★'.repeat(r.stars) + '☆'.repeat(4 - r.stars), ' ', r.label));
-      if (res?.isNew) badges.push(h('span', { class: 'badge new' }, `NEW! ${Object.keys(g.session.state.journal).length}/${JOURNAL_FISH.length}`));
-      if (res?.record) badges.push(h('span', { class: 'badge rec' }, 'Family record!'));
+      sub = f.junk ? t('Hmm… not a fish. Someone lost a boot!') : t('{n} cm', { n: size });
+      if (!f.junk) badges.push(h('span', { class: 'stars', style: { color: r.color } }, '★'.repeat(r.stars) + '☆'.repeat(4 - r.stars), ' ', t(r.label)));
+      if (res?.isNew) badges.push(h('span', { class: 'badge new' }, t('NEW! {n}/{total}', { n: Object.keys(g.session.state.journal).length, total: JOURNAL_FISH.length })));
+      if (res?.record) badges.push(h('span', { class: 'badge rec' }, t('Family record!')));
     }
     this.closeCatch?.();
     const close = () => {
@@ -272,9 +288,9 @@ export class UI {
     };
     this.closeCatch = close;
     const card = h('div', { class: 'catch' }, h('div', { class: 'catch-card' },
-      h('div', { class: 'catch-top' }, 'You caught…'),
+      h('div', { class: 'catch-top' }, t('You caught…')),
       art, h('div', { class: 'catch-name' }, title), h('div', { class: 'catch-sub' }, sub), h('div', { class: 'badges' }, badges),
-      tapButton({ class: 'btn primary', ontap: close }, extra === 'bottle' ? 'Aww 💛' : 'Yay! 🎉')));
+      tapButton({ class: 'btn primary', ontap: close }, extra === 'bottle' ? t('Aww 💛') : t('Yay! 🎉'))));
     card.firstChild.addEventListener('pointerdown', (e) => { e.stopPropagation(); close(); });
     this.root.appendChild(card);
     this.cardOpen = true;
@@ -284,9 +300,10 @@ export class UI {
   }
 
   // A cheerful card at the top that doesn't stop anyone from playing (fades by itself)
+  // title / name / text: finished text, English (e.g. a project's name), or T() messages
   banner(emoji, title, name, text) {
     this.bannerEl?.remove();
-    const el = h('div', { class: 'banner' }, h('span', { class: 'banner-ic' }, emoji), h('div', {}, h('small', {}, title), h('b', {}, name), h('p', {}, text)));
+    const el = h('div', { class: 'banner' }, h('span', { class: 'banner-ic' }, emoji), h('div', {}, h('small', {}, say(title)), h('b', {}, say(name)), h('p', {}, say(text))));
     el.addEventListener('pointerdown', (e) => { e.stopPropagation(); el.classList.remove('in'); setTimeout(() => el.remove(), 400); });
     this.root.appendChild(el);
     this.bannerEl = el;
@@ -301,7 +318,7 @@ export class UI {
   // full-screen message (connection lost etc.)
   showOverlay(html, buttons = []) {
     this.overlay.innerHTML = '';
-    this.overlay.append(h('div', { class: 'overlay-card' }, h('div', { html }), h('div', { class: 'row' }, buttons.map(([label, fn, cls]) => tapButton({ class: 'btn ' + (cls || ''), ontap: fn }, label)))));
+    this.overlay.append(h('div', { class: 'overlay-card' }, h('div', { html }), h('div', { class: 'row' }, buttons.map(([label, fn, cls]) => tapButton({ class: 'btn ' + (cls || ''), ontap: fn }, say(label))))));
     this.overlay.classList.remove('hidden');
   }
   hideOverlay() { this.overlay.classList.add('hidden'); }

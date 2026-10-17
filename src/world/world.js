@@ -10,6 +10,7 @@ import {
 } from '../render/materials.js';
 import { buildWalkGrid } from './walk.js';
 import { smoothstep, mulberry32, distToPolyline, distToSegment } from '../util/math.js';
+import { t } from '../i18n/i18n.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -106,7 +107,7 @@ function pondWaterGeometry(terrain) {
 }
 
 export async function buildWorld(scene, onProgress = () => {}) {
-  onProgress(0.05, 'Shaping the island…');
+  onProgress(0.05, t('Shaping the island…'));
   await nextFrame();
   const terrain = generateTerrain();
 
@@ -126,7 +127,7 @@ export async function buildWorld(scene, onProgress = () => {}) {
   flatten(terrain, L.PICNIC.x - 3, L.PICNIC.z - 2.5, L.PICNIC.x + 7, L.PICNIC.z + 2, 0.9, 3, 'set');
   flatten(terrain, L.BOARD.x - 1.6, L.BOARD.z - 1, L.BOARD.x + 1.6, L.BOARD.z + 1.5, 0.75, 2, 'set');
 
-  onProgress(0.25, 'Planting palm trees…');
+  onProgress(0.25, t('Planting palm trees…'));
   await nextFrame();
   const chunks = new ChunkedBuilder(L.WORLD_HALF, 44);
   const ctx = P.createPropContext(terrain, chunks);
@@ -198,12 +199,12 @@ export async function buildWorld(scene, onProgress = () => {}) {
   P.beachDecor(ctx);
   P.coralAndSeaweed(ctx);
 
-  onProgress(0.45, 'Sprinkling flowers…');
+  onProgress(0.45, t('Sprinkling flowers…'));
   await nextFrame();
   P.scatterGroundCover(ctx, [...ctx.colliders, ...ctx.surfaces.map((s) => ({ t: 'r', ...s })), ...plots.map((p) => ({ t: 'c', x: p.x, z: p.z, r: 1.8 })),
     { t: 'c', x: L.CAMPFIRE.x, z: L.CAMPFIRE.z, r: 3.5 }, { t: 'c', x: L.PICNIC.x + 2, z: L.PICNIC.z, r: 4.5 }, { t: 'c', x: L.LOGS_BLOCK.x, z: L.LOGS_BLOCK.z, r: 3 }]);
 
-  onProgress(0.6, 'Painting the shadows…');
+  onProgress(0.6, t('Painting the shadows…'));
   await nextFrame();
   const mask = makeMaskTexture(terrain, ctx.shadows);
   U.uMask.value = mask.tex;
@@ -211,7 +212,7 @@ export async function buildWorld(scene, onProgress = () => {}) {
   U.uCaustic.value = makeCausticTexture();
   const atlas = makeParticleAtlas();
 
-  onProgress(0.75, 'Filling the sea…');
+  onProgress(0.75, t('Filling the sea…'));
   await nextFrame();
   const propMat = makePropMaterial();
   const outlineMat = makeOutlineMaterial();
@@ -281,7 +282,7 @@ export async function buildWorld(scene, onProgress = () => {}) {
   const rr = mulberry32(55);
   for (let i = 0; i < 90; i++) {
     let x, z, ok = false;
-    for (let t = 0; t < 20 && !ok; t++) {
+    for (let tries = 0; tries < 20 && !ok; tries++) {
       x = -55 + rr() * 105; z = -45 + rr() * 75;
       ok = terrain.sampleGrid(terrain.grass, x, z) > 0.8;
     }
@@ -295,7 +296,7 @@ export async function buildWorld(scene, onProgress = () => {}) {
       const [ax, az] = path.pts[sgi], [bx, bz] = path.pts[sgi + 1];
       const len = Math.hypot(bx - ax, bz - az);
       for (let d = 1; d < len; d += 3.2) {
-        const t = d / len, x = ax + (bx - ax) * t + (sgi % 2 ? 1.6 : -1.6), z = az + (bz - az) * t;
+        const along = d / len, x = ax + (bx - ax) * along + (sgi % 2 ? 1.6 : -1.6), z = az + (bz - az) * along;
         glowPts.push(x, terrain.heightAt(x, z) + 2.4, z);
         glowData.push(1.9, rr(), 0, 0);
       }
@@ -317,7 +318,7 @@ export async function buildWorld(scene, onProgress = () => {}) {
   const bPts = [], bData = [];
   for (let i = 0; i < 28; i++) {
     let x = 0, z = 0;
-    for (let t = 0; t < 30; t++) {
+    for (let tries = 0; tries < 30; tries++) {
       x = -50 + rr() * 95; z = -40 + rr() * 60;
       if (terrain.sampleGrid(terrain.grass, x, z) > 0.9 && terrain.heightAt(x, z) < 2.5) break;
     }
@@ -332,7 +333,7 @@ export async function buildWorld(scene, onProgress = () => {}) {
   butterflies.renderOrder = 29;
   root.add(butterflies);
 
-  onProgress(0.88, 'Drawing the footpaths…');
+  onProgress(0.88, t('Drawing the footpaths…'));
   await nextFrame();
   const walk = buildWalkGrid(terrain, ctx);
   walk.addBlocker('logs', { t: 'c', x: L.LOGS_BLOCK.x, z: L.LOGS_BLOCK.z, r: 3.4 });

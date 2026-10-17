@@ -30,8 +30,9 @@
       <div class="boot-msg" id="boot-msg">Packing the picnic basket…</div>
     </div>
   </div>
+  <script>/* Thai phone? show the loading message in Thai (same choice as src/i18n/i18n.js) */(function(){try{var l=new URLSearchParams(location.search).get('lang')||JSON.parse(localStorage.getItem('cozycove.settings')||'{}').lang||((navigator.languages||[]).concat(navigator.language||'').some(function(x){return /^th\b/i.test(x)})?'th':'en');if(l==='th'){document.documentElement.lang='th';document.getElementById('boot-msg').textContent='กำลังจัดตะกร้าปิกนิก…'}}catch(e){}})()</script>
 </div>
-<noscript>Cozy Cove needs JavaScript turned on.</noscript>
+<noscript>Cozy Cove needs JavaScript turned on.<br>ต้องเปิด JavaScript ก่อนนะ ถึงจะเล่นเกมนี้ได้</noscript>
 <script type="module" src="%APP%"></script>
 </body>
 </html>

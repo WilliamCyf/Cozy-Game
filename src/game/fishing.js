@@ -5,14 +5,15 @@ import { MeshBuilder, blob, box, cylinder, prism, M, hex } from '../render/geo.j
 import { FISH, FISH_BY_ID, RARITY, HOOK_EXTRAS } from './data.js';
 import { clamp, lerp, weightedPick } from '../util/math.js';
 import { POND_LEVEL, ISLET_CENTER } from '../world/layout.js';
+import { t } from '../i18n/i18n.js';
 
 export const FS = { NONE: 0, CHARGE: 1, FLY: 2, WAIT: 3, BITE: 4, REEL: 5, LANDED: 6 };
 const MAXLINES = 4;
 const SEG = 14;
 
-export function timeOk(t, hour, raining) {
+export function timeOk(tm, hour, raining) {
   const day = hour >= 6 && hour < 19;
-  switch (t) {
+  switch (tm) {
     case 'day': return day;
     case 'night': return !day;
     case 'dawn': return hour >= 5 && hour < 8;
@@ -151,7 +152,7 @@ export class Fishing {
         return true;
       }
       case FS.WAIT:
-        this.ctx.ui?.toast('Reeled in. Try another spot!', '🎣', 1600);
+        this.ctx.ui?.toast(t('Reeled in. Try another spot!'), '🎣', 1600);
         this.stop();
         return true;
       case FS.BITE:
@@ -178,7 +179,7 @@ export class Fishing {
       if (walk.waterDepth(x, z) > 0.3) { tx = x; tz = z; break; }
     }
     if (tx === null) {
-      this.ctx.ui?.toast('Too close to land — face the water!', '🙈', 1800);
+      this.ctx.ui?.toast(t('Too close to land — face the water!'), '🙈', 1800);
       this.stop();
       return;
     }
@@ -225,7 +226,7 @@ export class Fishing {
     const relaxed = this.ctx.settings?.relaxedFishing !== false;
     this.state = FS.REEL;
     this.t = 0;
-    this.mg = { p: 0.2, tension: 0, pulling: false, holding: true, phaseT: 0.6 + Math.random() * 0.6, diff: RARITY[rar].diff * (relaxed ? 0.82 : 1.05), hint: 'Hold to reel!' };
+    this.mg = { p: 0.2, tension: 0, pulling: false, holding: true, phaseT: 0.6 + Math.random() * 0.6, diff: RARITY[rar].diff * (relaxed ? 0.82 : 1.05), hint: t('Hold to reel!') };
     this.ctx.ui?.biteAlert(false);
     this.local.char.play('reel');
     this.ctx.audio?.hook();
@@ -322,8 +323,8 @@ export class Fishing {
           this.t = 0;
           this.biteT = 1.8 + Math.random() * 3;
           this.nibbles = [];
-          this.ctx.ui?.toast('Too slow! Tap "Hook it!" when the bobber dips.', '💦', 2200);
-        } else this.escaped('It swam away… try again!');
+          this.ctx.ui?.toast(t('Too slow! Tap "Hook it!" when the bobber dips.'), '💦', 2200);
+        } else this.escaped(t('It swam away… try again!'));
       }
     } else if (st === FS.REEL) {
       this.updateReel(dt);
@@ -369,7 +370,7 @@ export class Fishing {
     }
     mg.tension = clamp(mg.tension, 0, 1);
     mg.p = clamp(mg.p, 0, 1);
-    mg.hint = mg.pulling ? (mg.holding ? 'Let go!' : 'Wait…') : mg.holding ? 'Reeling…' : 'Hold to reel!';
+    mg.hint = mg.pulling ? (mg.holding ? t('Let go!') : t('Wait…')) : mg.holding ? t('Reeling…') : t('Hold to reel!');
     // the bobber gets pulled towards us as we reel
     const L = this.local;
     const toward = 0.82 * mg.p;
@@ -381,8 +382,8 @@ export class Fishing {
     );
     if (mg.pulling && Math.random() < dt * 8) this.ctx.fx.splash(this.bob.x, this.level, this.bob.z, 0.35);
     if (mg.holding && Math.random() < dt * 6) this.ctx.audio?.reelClick();
-    if (mg.tension >= 1) { this.escaped('Snap! The line broke — let go when the fish pulls.'); return; }
-    if (mg.p <= 0.001 && this.t > 3) { this.escaped('The fish swam away. So close!'); return; }
+    if (mg.tension >= 1) { this.escaped(t('Snap! The line broke — let go when the fish pulls.')); return; }
+    if (mg.p <= 0.001 && this.t > 3) { this.escaped(t('The fish swam away. So close!')); return; }
     if (mg.p >= 1) this.caught();
   }
 
@@ -414,8 +415,8 @@ export class Fishing {
       // tension colour for our own line
       let r = 0.25, g = 0.2, b = 0.18;
       if (p.local && this.state === FS.REEL) {
-        const t = this.mg.tension;
-        r = lerp(0.95, 0.95, t); g = lerp(0.95, 0.3, t); b = lerp(0.95, 0.2, t);
+        const tn = this.mg.tension;
+        r = lerp(0.95, 0.95, tn); g = lerp(0.95, 0.3, tn); b = lerp(0.95, 0.2, tn);
       }
       // a sagging line from the rod tip to the bobber
       const sag = fs === FS.REEL ? 0.15 : 0.6;
