@@ -51,6 +51,15 @@ try {
   await a.fill('.sheet .name-input', '');
   await a.type('.sheet .name-input', 'Grandpa Somchai', { delay: 20 });
   check(await a.$eval('.sheet .name-input', (e) => e.value) === 'Grandpa Somc', 'typing a long name stops at 12 letters');
+  // fixing a typo in the middle of a full box: the cursor stays where you are typing
+  await a.focus('.sheet .name-input');
+  await a.$eval('.sheet .name-input', (e) => e.setSelectionRange(5, 5)); // after "Grand"
+  await a.keyboard.type('m');
+  const mid1 = await a.$eval('.sheet .name-input', (e) => [e.value, e.selectionStart]);
+  await a.keyboard.press('Backspace');
+  await a.keyboard.type('x');
+  const mid2 = await a.$eval('.sheet .name-input', (e) => [e.value, e.selectionStart]);
+  check(mid1[0] === 'Grandpa Somc' && mid1[1] === 5 && mid2[0] === 'Granxpa Somc' && mid2[1] === 5, `typing in the middle of a full name keeps the cursor in place (${JSON.stringify([mid1, mid2])})`);
   await a.fill('.sheet .name-input', '');
   await a.type('.sheet .name-input', 'คุณตาสมศักดิ์', { delay: 20 });
   check(await a.$eval('.sheet .name-input', (e) => e.value) === 'คุณตาสมศักดิ์', 'a Thai name of 9 letters (13 computer characters) fits whole');

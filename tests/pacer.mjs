@@ -10,7 +10,10 @@ import { QUALITY } from '../src/render/quality.js';
 let ok = true;
 const check = (cond, msg) => { console.log((cond ? 'PASS ' : 'FAIL ') + msg); if (!cond) ok = false; };
 
-function run({ hz, preset = 'cool', work, idleFps = 0, seconds = 120, startScale = 1 }) {
+// work: ms per drawn frame (or a function of the sharpness and the second we're at)
+// idle: the slower rate asked for (a page open = 24, resting = 20…), or a function of the second
+// late: extra ms the phone is late stamping a frame (a busy moment), as a function of the second
+function run({ hz, preset = 'cool', work, idleFps = 0, idle = null, late = null, seconds = 120, startScale = 1 }) {
   const state = { preset: QUALITY[preset], autoScale: startScale, lastRender: 0, slowFrames: 0, fastFrames: 0, paused: false, idleFps };
   let resizes = 0;
   const shouldRender = makePacer(state, () => { resizes++; });
@@ -20,11 +23,13 @@ function run({ hz, preset = 'cool', work, idleFps = 0, seconds = 120, startScale
   let t = 1000, draws = 0, drawsLast10 = 0;
   const end = 1000 + seconds * 1000;
   while (t < end) {
-    const now = t + jitter();
+    const sec = (t - 1000) / 1000;
+    if (idle) state.idleFps = idle(sec);
+    const now = t + jitter() + (late ? late(sec) : 0);
     if (shouldRender(now)) {
       draws++;
       if (t > end - 10000) drawsLast10++;
-      const w = typeof work === 'function' ? work(state.autoScale) : work;
+      const w = typeof work === 'function' ? work(state.autoScale, sec) : work;
       t = Math.max(t + tick, Math.ceil((t + w) / tick) * tick); // next offer: the first screen tick after our work
     } else t += tick;
   }
@@ -67,6 +72,22 @@ check(r.scale === 1 && Math.abs(r.fps - 12) < 1, `title screen resting at 12 fps
 // 5. when the phone has cooled down, sharpness comes back, step by step
 r = run({ hz: 60, work: 6, startScale: 0.76, seconds: 240 });
 check(r.scale === 1, `cooled down: sharpness back to ${r.scale.toFixed(2)}`);
+
+// 5b. …also after a page was opened and closed while it cooled (that can put the schedule a little out
+//     of step), and with an odd late frame now and then
+const hotThenCool = (s, sec) => (sec < 60 ? 37 : 8);
+for (const open of [0.5, 1.3, 3, 7]) {
+  r = run({ hz: 60, work: hotThenCool, idle: (sec) => (sec >= 70 && sec < 70 + open ? 24 : 0), seconds: 60 + 360 });
+  check(r.scale === 1, `hot for a minute, then a page open for ${open} s while cooling: sharpness back to ${r.scale.toFixed(2)} within 6 minutes`);
+}
+r = run({ hz: 60, work: hotThenCool, late: (sec) => (sec > 60 && Math.abs(sec % 5) < 0.02 ? 5 + (sec % 7) : 0), seconds: 60 + 480 });
+check(r.scale === 1, `hot, then cooling with a late frame every 5 s: sharpness back to ${r.scale.toFixed(2)}`);
+r = run({ hz: 60, work: hotThenCool, seconds: 60 });
+check(r.scale < 1, `(and the hot minute in those cases really did brake: ${r.scale.toFixed(2)})`);
+
+// 3b. Low Power Mode: one odd quick frame now and then (a busy moment) is not a reason to brake
+r = run({ hz: 30, preset: 'smooth', work: 6, late: (sec) => (Math.abs(sec % 2.5) < 0.03 ? 10 : 0), seconds: 180 });
+check(r.scale === 1, `Low Power Mode, "Extra smooth", an odd quick frame every 2.5 s: full sharpness (${r.scale.toFixed(2)})`);
 
 // 6. "Extra smooth" on a phone that keeps up: 60 fps, full sharpness
 r = run({ hz: 60, preset: 'smooth', work: 8 });

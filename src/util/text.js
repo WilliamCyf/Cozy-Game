@@ -29,10 +29,20 @@ export const cleanName = (s, fallback = 'Friend') => shortText(String(s ?? '').s
 // A text box that stops at n letters while typing (Thai marks don't count as extra letters),
 // so the box never shows more than will be saved.
 export function limitLetters(input, n) {
+  const count = (s) => letters(s)?.length ?? s.length;
   const cut = (e) => {
     if (e?.isComposing) return; // (Chinese/Japanese keyboards: wait until the word is finished)
-    const c = firstLetters(input.value, n);
-    if (c !== input.value) input.value = c;
+    const v = input.value;
+    if (firstLetters(v, n) === v) return;
+    // too long: drop the new letters where they were typed (also in the middle of the name),
+    // keep the rest, and leave the cursor where it was
+    const at = input.selectionEnd ?? v.length;
+    const after = v.slice(at);
+    const before = firstLetters(v.slice(0, at), Math.max(0, n - count(after)));
+    let nv = before + after;
+    if (firstLetters(nv, n) !== nv) nv = firstLetters(nv, n);
+    input.value = nv;
+    try { input.setSelectionRange(Math.min(before.length, nv.length), Math.min(before.length, nv.length)); } catch { /* ignore */ }
   };
   input.addEventListener('input', cut);
   input.addEventListener('compositionend', cut);
