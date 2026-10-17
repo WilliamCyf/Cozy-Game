@@ -178,6 +178,10 @@ export class UI {
   // The language changed: rewrite every label on screen in the new language, right away.
   relabel() {
     this._day = null; this._clockKey = null; this._actLabel = null; this._reelHint = null; this._hintIn = null; this._hint = null;
+    // messages already on screen were written in the old language: let them fade away now
+    for (const el of this.toasts) { el.classList.remove('in'); el.classList.add('out'); setTimeout(() => el.remove(), 400); }
+    this.toasts = [];
+    if (this.bannerEl) { const b = this.bannerEl; this.bannerEl = null; b.classList.remove('in'); setTimeout(() => b.remove(), 400); this.toastBox.classList.remove('below-banner'); }
     for (const [el, key] of [[this.menuBtn, 'Menu'], [this.action, 'Action'], [this.emoteBtn, 'Emotes'], [this.basketBtn, 'Basket'], [this.journalBtn, 'Fish journal']]) el.setAttribute('aria-label', t(key));
     if (this.updatePill) setText(this.updatePill.lastChild, t('New version ready · tap to update'));
     this.refreshSheet(); // an open panel (e.g. Settings) is redrawn in the new language too
