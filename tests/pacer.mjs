@@ -14,13 +14,15 @@ const check = (cond, msg) => { console.log((cond ? 'PASS ' : 'FAIL ') + msg); if
 // idle: the slower rate asked for (a page open = 24, resting = 20…), or a function of the second
 // late: extra ms the phone is late stamping a frame (a busy moment), as a function of the second
 // hidden: true while the app is in the background (the phone offers no frames at all then)
-function run({ hz, preset = 'cool', work, idleFps = 0, idle = null, late = null, hidden = null, seconds = 120, startScale = 1 }) {
+// jit: how much the phone's frame timestamps wobble (ms); after: how long after each screen tick the
+// timestamp is taken (a real phone runs the frame a little after the tick); whole: rounded down to whole ms (Safari)
+function run({ hz, preset = 'cool', work, idleFps = 0, idle = null, late = null, hidden = null, seconds = 120, startScale = 1, jit = 0.6, after = 0, whole = false }) {
   const state = { preset: QUALITY[preset], autoScale: startScale, lastRender: 0, slowFrames: 0, fastFrames: 0, paused: false, idleFps };
   let resizes = 0;
   const shouldRender = makePacer(state, () => { resizes++; });
   const tick = 1000 / hz;
   let seed = 7;
-  const jitter = () => { seed = (seed * 16807) % 2147483647; return (seed / 2147483647 - 0.5) * 0.6; };
+  const jitter = () => { seed = (seed * 16807) % 2147483647; return after ? after + (seed / 2147483647) * jit : (seed / 2147483647 - 0.5) * jit; };
   let t = 1000, draws = 0, drawsLast10 = 0, guardOn = 0, guardTries = 0, wasGuard = false, firstGuard = -1;
   const end = 1000 + seconds * 1000;
   while (t < end) {
@@ -28,7 +30,8 @@ function run({ hz, preset = 'cool', work, idleFps = 0, idle = null, late = null,
     if (hidden && hidden(sec)) { t += tick; continue; }
     if (idle) state.idleFps = idle(sec);
     if (state.guard !== wasGuard) { wasGuard = state.guard; if (wasGuard) { guardOn++; if (firstGuard < 0) firstGuard = sec; } else guardTries++; }
-    const now = t + jitter() + (late ? late(sec) : 0);
+    let now = t + jitter() + (late ? late(sec) : 0);
+    if (whole) now = Math.floor(now);
     if (shouldRender(now)) {
       draws++;
       if (t > end - 10000) drawsLast10++;
@@ -155,6 +158,21 @@ check(r.guard, `guard: a phone stuck at about 50 fps drops to 30 (guard on: ${r.
 let n3 = 0;
 r = run({ hz: 60, preset: 'smooth', work: () => (++n3 % 40 === 0 ? 25 : 8), seconds: 600 });
 check(!r.guard && r.guardOn === 0 && r.fps > 57, `guard: a healthy phone with an odd slow frame keeps 60 (${r.fps} fps, guard ${r.guardOn}x)`);
+
+// a hiccup that ends at an unlucky moment between two screen ticks, with Safari-like timestamps
+// (whole milliseconds, ~1 ms wobble): the pictures after it must not be turned away
+// (the hiccup's last picture is stamped d ms after its screen tick: every moment between two ticks is tried)
+for (const whole of [false, true]) {
+  let unlucky = 0, tried = 0;
+  for (let d = 0; d < 16.6; d += 0.1) {
+    tried++;
+    r = run({ hz: 60, preset: 'smooth', jit: 1, after: 0.4, whole, work: (s, sec) => (Math.abs(sec - 20) < 0.01 ? 70 : 9), late: firstLate(d, 20.05), seconds: 60 });
+    if (r.guard || r.guardOn || r.fps < 58) unlucky++;
+  }
+  check(unlucky === 0, `guard: a hiccup ending at any moment between two screen ticks keeps a healthy phone at 60${whole ? ' (whole-ms timestamps)' : ''} (${unlucky} of ${tried} went wrong)`);
+}
+r = run({ hz: 60, preset: 'smooth', jit: 1, after: 0.4, whole: true, work: 9, seconds: 600 });
+check(!r.guard && r.guardOn === 0 && r.fps > 58, `guard: Safari-like timestamps on a healthy phone: 60 fps for 10 minutes (${r.fps} fps, guard ${r.guardOn}x)`);
 
 console.log(ok ? 'ALL PASSED' : 'SOME CHECKS FAILED');
 process.exit(ok ? 0 : 1);

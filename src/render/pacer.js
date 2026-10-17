@@ -52,6 +52,7 @@ export function makePacer(state, applySize) {
     // Move the "last drawn" clock forward in whole steps so the rhythm stays even.
     if (since > interval * 3) state.lastRender = now;
     else state.lastRender += interval * Math.max(1, Math.floor((since + 4) / interval));
+    if (state.lastRender > now) state.lastRender = now; // (never ahead of the clock: on-time pictures would then be turned away)
     // Adaptive resolution: if frames keep arriving late, draw fewer pixels. "Late" must be true by
     // the schedule AND by the real time since the last picture (the schedule can sit a little out of
     // step after a start, a page or a hiccup, and then on-time pictures would look late).
