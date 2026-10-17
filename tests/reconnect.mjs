@@ -1,9 +1,14 @@
 // Connection hiccups: a dropped connection, and the host's phone "going to sleep" for a while.
+//   node tests/reconnect.mjs [both|peer|relay]    (needs `npm run serve` running)
+// Phones connect over two roads at once (PeerJS and the Trystero relay) and use whichever answers
+// first, so 'peer' and 'relay' force one road, to test each for sure.
 import { chromium } from 'playwright';
 import { startServers } from './servers.mjs';
 
+const road = process.argv[2] || 'both';
 const servers = startServers();
-const base = 'http://localhost:8080/?nosw&notut&quality=saver&signal=127.0.0.1:9000&relay=ws://127.0.0.1:7777';
+const base = 'http://localhost:8080/?nosw&notut&quality=saver&signal=127.0.0.1:9000&relay=ws://127.0.0.1:7777' + (road === 'peer' ? '&notry' : road === 'relay' ? '&nopeer' : '');
+console.log(`road: ${road}`);
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let ok = true;
@@ -69,7 +74,7 @@ try {
   console.log('FAIL exception', e.message);
 }
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');
-console.log(ok ? 'ALL PASSED' : 'SOME FAILED');
+console.log(ok && !errors.length ? 'ALL PASSED' : 'SOME CHECKS FAILED');
 await browser.close();
 servers.close();
-process.exit(0);
+process.exit(ok && !errors.length ? 0 : 1);

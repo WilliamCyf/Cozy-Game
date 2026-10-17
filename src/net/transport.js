@@ -43,6 +43,10 @@ function leaveRoom(room) {
   return roomLeaving;
 }
 const dbg = params.has('netdebug') ? (...a) => console.log('[dbg] net', ...a) : () => {};
+// On the Trystero road, the host hanging up on one phone (that phone went quiet, or a newer
+// connection of the same player replaced it) is invisible to that phone: the room stays open.
+// So the host says so with this tiny signal. (Not JSON: older versions of the game just ignore it.)
+const HANGUP = '\u0000hangup';
 const useTry = !params.has('notry');
 
 // A Link = one open conversation with one other phone.
@@ -211,7 +215,7 @@ export class HostTransport {
         dbg('host: peer join', peerId);
         let link = this.tryLinks.get(peerId);
         if (link && !link.closed) return;
-        link = new Link('trystero', (s) => act.send(s, { target: peerId }), () => {});
+        link = new Link('trystero', (s) => act.send(s, { target: peerId }), () => { try { act.send(HANGUP, { target: peerId }); } catch { /* ignore */ } });
         this.tryLinks.set(peerId, link);
         this.onLink(link);
       };
@@ -322,7 +326,9 @@ export function joinHost(code, timeoutMs = 20000, signal = null) {
         };
         act.onMessage = (data, meta) => {
           const peerId = meta?.peerId ?? meta;
-          if (link && peerId === hostId) link.receive(data);
+          if (!link || peerId !== hostId) return;
+          if (data === HANGUP) { dbg('guest: the host hung up'); link.dropped(); return; } // reconnects like any drop
+          link.receive(data);
         };
         room.onPeerLeave = (peerId) => { dbg('guest: peer leave', peerId, peerId === hostId ? '(host!)' : ''); if (link && peerId === hostId) link.dropped(); };
       } catch (e) {
