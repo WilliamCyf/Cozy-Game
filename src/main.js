@@ -42,9 +42,14 @@ function loadProfile() {
   if (params.has('notut')) p.tut = { moved: 1, fished: 1, board: 1, planted: 1 };
   return p;
 }
-const DEFAULT_SETTINGS = { quality: 'cool', music: 0.6, sfx: 0.8, relaxedFishing: true, nameTags: true, showFps: false };
+// New phones start on "Extra smooth" (60 fps); its heat guard drops to 30 by itself when the phone
+// can't keep up or warms up (see render/pacer.js).
+const DEFAULT_SETTINGS = { quality: 'smooth', music: 0.6, sfx: 0.8, relaxedFishing: true, nameTags: true, showFps: false };
 function loadSettings() {
-  const s = { ...DEFAULT_SETTINGS, ...store.get('cozycove.settings', {}) };
+  const saved = store.get('cozycove.settings', {});
+  const s = { ...DEFAULT_SETTINGS, ...saved };
+  // a phone that already played before 60 fps was the default keeps what it had (30 fps)
+  if (!saved.quality && (profile.name || loadIsland())) s.quality = 'cool';
   if (params.get('quality')) s.quality = params.get('quality');
   if (params.has('fps')) s.showFps = true;
   s.lang = params.get('lang') || s.lang || getLang(); // first launch: follow the iPhone's language

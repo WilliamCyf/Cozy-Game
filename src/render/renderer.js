@@ -4,7 +4,7 @@
 //  * resolution - draw fewer pixels than the screen's maximum, and lower it
 //                 automatically if the phone is struggling (it gets slower when hot)
 import * as THREE from 'three';
-import { makePacer } from './pacer.js';
+import { makePacer, resetGuard } from './pacer.js';
 import { QUALITY } from './quality.js';
 
 export { QUALITY }; // (the Graphics choices live in quality.js)
@@ -53,6 +53,7 @@ export function createRenderer(canvas) {
     state.preset = QUALITY[state.qualityName];
     state.autoScale = 1;
     state.slowFrames = state.fastFrames = 0;
+    resetGuard(state);
     applySize();
   }
 

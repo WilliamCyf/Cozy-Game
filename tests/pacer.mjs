@@ -13,18 +13,21 @@ const check = (cond, msg) => { console.log((cond ? 'PASS ' : 'FAIL ') + msg); if
 // work: ms per drawn frame (or a function of the sharpness and the second we're at)
 // idle: the slower rate asked for (a page open = 24, resting = 20…), or a function of the second
 // late: extra ms the phone is late stamping a frame (a busy moment), as a function of the second
-function run({ hz, preset = 'cool', work, idleFps = 0, idle = null, late = null, seconds = 120, startScale = 1 }) {
+// hidden: true while the app is in the background (the phone offers no frames at all then)
+function run({ hz, preset = 'cool', work, idleFps = 0, idle = null, late = null, hidden = null, seconds = 120, startScale = 1 }) {
   const state = { preset: QUALITY[preset], autoScale: startScale, lastRender: 0, slowFrames: 0, fastFrames: 0, paused: false, idleFps };
   let resizes = 0;
   const shouldRender = makePacer(state, () => { resizes++; });
   const tick = 1000 / hz;
   let seed = 7;
   const jitter = () => { seed = (seed * 16807) % 2147483647; return (seed / 2147483647 - 0.5) * 0.6; };
-  let t = 1000, draws = 0, drawsLast10 = 0;
+  let t = 1000, draws = 0, drawsLast10 = 0, guardOn = 0, guardTries = 0, wasGuard = false, firstGuard = -1;
   const end = 1000 + seconds * 1000;
   while (t < end) {
     const sec = (t - 1000) / 1000;
+    if (hidden && hidden(sec)) { t += tick; continue; }
     if (idle) state.idleFps = idle(sec);
+    if (state.guard !== wasGuard) { wasGuard = state.guard; if (wasGuard) { guardOn++; if (firstGuard < 0) firstGuard = sec; } else guardTries++; }
     const now = t + jitter() + (late ? late(sec) : 0);
     if (shouldRender(now)) {
       draws++;
@@ -33,7 +36,7 @@ function run({ hz, preset = 'cool', work, idleFps = 0, idle = null, late = null,
       t = Math.max(t + tick, Math.ceil((t + w) / tick) * tick); // next offer: the first screen tick after our work
     } else t += tick;
   }
-  return { scale: state.autoScale, resizes, fps: drawsLast10 / 10 };
+  return { scale: state.autoScale, resizes, fps: drawsLast10 / 10, guard: state.guard, guardOn, guardTries, firstGuard };
 }
 
 // 1. a phone that is fine: no brake, steady 30 fps
@@ -109,6 +112,29 @@ check(r.scale === 1 && r.resizes === 0, `busy but on-time frames with one slow o
 // 6. "Extra smooth" on a phone that keeps up: 60 fps, full sharpness
 r = run({ hz: 60, preset: 'smooth', work: 8 });
 check(r.scale === 1 && r.fps > 58, `"Extra smooth", light frames: full sharpness, ${r.fps} fps`);
+
+// 7. the heat guard for "Extra smooth" (the default for new phones): 60 fps while the phone keeps up,
+//    30 fps by itself when it can't (warm phone, Low Power Mode), and 60 again once it has cooled
+r = run({ hz: 60, preset: 'smooth', work: 8, seconds: 600 });
+check(!r.guard && r.guardOn === 0 && r.fps > 58 && r.scale === 1, `guard: a phone that keeps up stays at 60 fps for 10 minutes (${r.fps} fps, guard came on ${r.guardOn}x)`);
+r = run({ hz: 120, preset: 'smooth', work: 8, seconds: 300 });
+check(!r.guard && r.fps > 58 && r.scale === 1, `guard: 120 Hz screen keeps 60 fps (${r.fps} fps)`);
+r = run({ hz: 60, preset: 'smooth', work: 20 });
+check(r.guard && r.firstGuard < 10 && Math.abs(r.fps - 30) < 1 && r.scale === 1, `guard: a phone that can't keep 60 drops to 30 within ${r.firstGuard.toFixed(1)} s, full sharpness (${r.fps} fps)`);
+r = run({ hz: 60, preset: 'smooth', work: (s, sec) => (sec < 60 ? 8 : 22), seconds: 120 });
+check(r.guard && r.firstGuard > 60 && r.firstGuard < 70 && Math.abs(r.fps - 30) < 1, `guard: the phone warms up after a minute: 30 fps from ${r.firstGuard.toFixed(1)} s (${r.fps} fps)`);
+r = run({ hz: 60, preset: 'smooth', work: (s, sec) => (sec < 60 ? 22 : 8), seconds: 60 + 480 });
+check(!r.guard && r.guardTries === 1 && r.fps > 58, `guard: once cool again, back to 60 fps (${r.fps} fps after ${r.guardTries} try)`);
+r = run({ hz: 30, preset: 'smooth', work: 6, seconds: 3600 });
+check(r.guard && r.guardTries <= 4 && r.scale === 1 && Math.abs(r.fps - 30) < 1, `guard: Low Power Mode for an hour: 30 fps, only ${r.guardTries} quick tries of 60, full sharpness`);
+r = run({ hz: 60, preset: 'smooth', work: 45, seconds: 180 });
+check(r.guard && r.scale < 1, `guard: a hot phone gets both: 30 fps and fewer pixels (sharpness ${r.scale.toFixed(2)})`);
+r = run({ hz: 60, preset: 'smooth', work: 8, hidden: (sec) => sec > 20 && sec < 50, seconds: 120 });
+check(!r.guard && r.guardOn === 0 && r.fps > 58, `guard: hiding the app for 30 s doesn't count as slow (${r.fps} fps, guard ${r.guardOn}x)`);
+r = run({ hz: 60, preset: 'smooth', work: (s, sec) => (Math.abs(sec - 30) < 0.01 ? 300 : 8), seconds: 120 });
+check(!r.guard && r.guardOn === 0, `guard: one 300 ms hiccup doesn't trip it (guard ${r.guardOn}x)`);
+r = run({ hz: 60, preset: 'smooth', work: 8, idle: (sec) => (sec % 20 < 6 ? 24 : sec > 100 && sec < 160 ? 20 : 0), seconds: 240 });
+check(!r.guard && r.guardOn === 0 && r.fps > 58, `guard: opening pages and resting now and then doesn't trip it (${r.fps} fps, guard ${r.guardOn}x)`);
 
 console.log(ok ? 'ALL PASSED' : 'SOME CHECKS FAILED');
 process.exit(ok ? 0 : 1);

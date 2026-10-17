@@ -445,6 +445,8 @@ export function settingsPanel(g) {
       b.append(h('h3', {}, t('Graphics')));
       b.append(h('p', { class: 'lead small' }, t('Lower settings keep the phone cooler and the battery happier.')));
       b.append(h('div', { class: 'seg' }, Object.entries(QUALITY).map(([k, q]) => tapButton({ class: 'seg-b' + (st.quality === k ? ' on' : ''), ontap: () => { g.setSetting('quality', k); g.ui.refreshSheet(); } }, t(q.label)))));
+      // the heat guard is holding "Extra smooth" at 30 for now: say so (it goes back to 60 by itself)
+      if (g.R.state.guard && g.R.state.preset.fps > 30) b.append(h('p', { class: 'lead small' }, t('🌡️ Running at 30 fps for now, to keep the phone cool. It goes back to 60 by itself.')));
       const slider = (label, key) => {
         const inp = h('input', { type: 'range', min: 0, max: 1, step: 0.05, value: st[key] });
         inp.addEventListener('input', () => g.setSetting(key, Number(inp.value)));

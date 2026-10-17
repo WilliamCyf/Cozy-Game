@@ -5,7 +5,9 @@ The game must **never be laggy, never be buggy, and never make the iPhone hot**.
 Check every change against this before calling it done:
 - No work every frame that could be done once (cache results; recompute only when a value changes).
 - No new objects/strings/arrays created every frame (garbage collection causes stutters and heat).
-- Keep draw calls, triangles and texture sizes low; respect the 30 fps cap and adaptive resolution.
+- Keep draw calls, triangles and texture sizes low; respect the frame cap (new phones: 60 fps with the
+  heat guard in src/render/pacer.js, which drops to 30 when the phone can't keep up) and adaptive resolution.
+  Run `node tests/pacer.mjs` after touching frame timing.
 - Anything new must stop when the app is hidden and stay idle-friendly.
 - Test it (tests/*.mjs) and look at screenshots before pushing.
 

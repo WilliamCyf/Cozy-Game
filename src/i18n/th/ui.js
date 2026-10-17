@@ -101,4 +101,5 @@ export default {
   'Waking up the crabs…': 'กำลังปลุกน้องปู…',
   'Oh no — this phone couldn’t start the 3D graphics. Try closing other apps and opening Cozy Cove again.': 'แย่จัง — มือถือเครื่องนี้เปิดภาพ 3 มิติไม่ได้ ลองปิดแอปอื่นๆ แล้วเปิดเกมนี้ใหม่อีกครั้งนะ',
   'The Home Screen app gets its own island, separate from this one in Safari.': 'แอปบนหน้าจอโฮมจะมีเกาะของตัวเอง แยกจากเกาะนี้ในซาฟารี',
+  '🌡️ Running at 30 fps for now, to keep the phone cool. It goes back to 60 by itself.': '🌡️ ตอนนี้เล่นที่ 30 เฟรมไปก่อน เพื่อไม่ให้มือถือร้อน เดี๋ยวจะกลับไปเป็น 60 เฟรมเอง',
 };

@@ -92,13 +92,15 @@ When a new version is published:
 ## 7. Cool phone, happy battery
 
 The game was built to stay cool:
-* It draws **30 pictures per second** (half the usual work) and never more pixels than needed.
-* If the phone gets busy or warm, it **automatically lowers the detail** to stay smooth.
+* New phones draw **60 pictures per second** for extra smoothness, with a **heat guard**: if the phone
+  can't keep up or gets warm (or is in Low Power Mode), it drops to 30 by itself, and tries 60 again
+  once the phone has cooled down. It never draws more pixels than needed.
+* If the phone is still busy or warm, it **automatically lowers the detail** to stay smooth.
 * It slows down further when nobody is touching the screen, and **stops completely** in the background.
 * Shadows and lighting are "painted" once when the game starts instead of being calculated every frame.
 
-You can choose in **☰ → Settings → Graphics**: *Cool & cozy* (default), *Extra smooth (60 fps)*, or
-*Battery saver*. No sound? Check the silent switch on the side of the iPhone.
+You can choose in **☰ → Settings → Graphics**: *Cool & cozy (30 fps)*, *Extra smooth (60 fps)* (the
+default for new phones; phones that played before keep *Cool & cozy*), or *Battery saver*. No sound? Check the silent switch on the side of the iPhone.
 
 ---
 
