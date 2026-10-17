@@ -102,7 +102,7 @@ async function boot() {
     ownedHats: () => loadIsland()?.hats || [],
     onHost: () => startHost(),
     onJoin: (code) => startJoin(code),
-    back: () => { cancelJoin = true; showTitle(); },
+    back: () => { cancelStart(); showTitle(); },
     audio,
     preview: (look) => setPreview(look),
     setLang: (id) => changeLang(id),
@@ -175,6 +175,7 @@ function makeSession() {
   return new Session({ world, spawns, profile, debug: params.has('debug') });
 }
 function startGame(session) {
+  if (game) { session.leave(); return; } // only ever one game at a time
   screens.hide();
   if (previewChar) { previewChar.dispose(); previewChar = null; }
   game = new Game({ R, rig, scene, world, spawns, session, profile, settings, audio, input, uiRoot,
@@ -185,27 +186,37 @@ function startGame(session) {
   window.__game = game;
   if (updateWaiting) game.ui.updateReady(() => applyUpdate()); // a new version arrived before the game started
 }
+// Only ever ONE game at a time, however many times a button is tapped. Each start gets a ticket
+// number (like at a deli counter); a join that finishes late, after Cancel or after another start,
+// sees its ticket is out of date and quietly stops.
+let ticket = 0, joining = false;
 function startHost() {
+  if (game) return;
+  ticket++; joining = false;
   const session = makeSession();
   session.startHost();
   startGame(session);
 }
-let cancelJoin = false;
+function cancelStart() { ticket++; joining = false; }
 async function startJoin(code) {
-  cancelJoin = false;
+  if (game || joining) return;
+  joining = true;
+  const mine = ++ticket;
   const session = makeSession();
   try {
     await session.join(code);
-    if (cancelJoin) { session.leave(); return; }
+    if (params.has('debug') && window.__slowJoin) await new Promise((r) => setTimeout(r, window.__slowJoin)); // (tests only: a slow phone)
+    if (mine !== ticket || game) { session.leave(); return; }
+    joining = false;
     startGame(session);
   } catch (e) {
-    if (cancelJoin) return;
+    if (mine !== ticket || game) return;
+    joining = false;
     try { sessionStorage.removeItem('cozycove.resume'); } catch { /* ignore */ }
     // a "no" from the host arrives as a message object (or English text from an older host): show it in this phone's language
     const msg = tr(e?.kick?.msg) || t('Couldn’t find that island. Check the code, and make sure Cozy Cove is open on the host’s phone (same Wi-Fi works best).');
     screens.join(code, msg);
     if (e?.kick?.why === 'version') checkForUpdate(true); // maybe this phone is the old one: fetch the new version
-
   }
 }
 
