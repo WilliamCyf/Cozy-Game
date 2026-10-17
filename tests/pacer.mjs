@@ -32,7 +32,7 @@ function run({ hz, preset = 'cool', work, idleFps = 0, idle = null, late = null,
     if (shouldRender(now)) {
       draws++;
       if (t > end - 10000) drawsLast10++;
-      const w = typeof work === 'function' ? work(state.autoScale, sec) : work;
+      const w = typeof work === 'function' ? work(state.autoScale, sec, state) : work;
       t = Math.max(t + tick, Math.ceil((t + w) / tick) * tick); // next offer: the first screen tick after our work
     } else t += tick;
   }
@@ -135,6 +135,26 @@ r = run({ hz: 60, preset: 'smooth', work: (s, sec) => (Math.abs(sec - 30) < 0.01
 check(!r.guard && r.guardOn === 0, `guard: one 300 ms hiccup doesn't trip it (guard ${r.guardOn}x)`);
 r = run({ hz: 60, preset: 'smooth', work: 8, idle: (sec) => (sec % 20 < 6 ? 24 : sec > 100 && sec < 160 ? 20 : 0), seconds: 240 });
 check(!r.guard && r.guardOn === 0 && r.fps > 58, `guard: opening pages and resting now and then doesn't trip it (${r.fps} fps, guard ${r.guardOn}x)`);
+
+// a phone that keeps up for a while after cooling, then warms up again (the real heat pattern):
+// the waits must grow (5, 10, 20, 40 min), not flip between 60 and 30 every 5 minutes all evening
+for (const warmAfter of [10, 60, 180]) {
+  let since60 = null;
+  const warming = (s, sec, st) => { if (st.guard) { since60 = null; return 8; } if (since60 === null) since60 = sec; return sec - since60 > warmAfter ? 22 : 8; };
+  r = run({ hz: 60, preset: 'smooth', work: warming, seconds: 3 * 3600 });
+  check(r.guardOn <= 7, `guard: warms up ${warmAfter} s after each try: only ${r.guardOn} switches to 30 in 3 hours (waits grow)`);
+}
+// graphics chip working flat out at 50-something fps (some frames just miss): that is a warm phone too
+let n1 = 0;
+r = run({ hz: 60, preset: 'smooth', work: () => (++n1 % 8 === 0 ? 18 : 15.5), seconds: 60 });
+check(r.guard, `guard: a phone stuck at about 53 fps drops to 30 (guard on: ${r.guard})`);
+let n2 = 0;
+r = run({ hz: 60, preset: 'smooth', work: () => (++n2 % 5 === 0 ? 18 : 16), seconds: 60 });
+check(r.guard, `guard: a phone stuck at about 50 fps drops to 30 (guard on: ${r.guard})`);
+// …but a healthy phone with the odd slightly slow frame keeps 60
+let n3 = 0;
+r = run({ hz: 60, preset: 'smooth', work: () => (++n3 % 40 === 0 ? 25 : 8), seconds: 600 });
+check(!r.guard && r.guardOn === 0 && r.fps > 57, `guard: a healthy phone with an odd slow frame keeps 60 (${r.fps} fps, guard ${r.guardOn}x)`);
 
 console.log(ok ? 'ALL PASSED' : 'SOME CHECKS FAILED');
 process.exit(ok ? 0 : 1);

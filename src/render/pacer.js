@@ -9,8 +9,11 @@
 const RHYTHM_60 = 1000 / 60, RHYTHM_30 = 1000 / 30;
 // The heat guard for "Extra smooth" (60 fps): if 60 pictures a second can't be kept up for a few
 // seconds (a warm iPhone slows itself down, and so does Low Power Mode), aim for 30 instead. After
-// the phone has been cool for a while, try 60 again; each try that fails waits twice as long.
-const GUARD_WINDOW = 4000, GUARD_MIN_FPS = 45, GUARD_FPS = 30;
+// the phone has been cool for a while, try 60 again; each try that fails waits twice as long. A try
+// only counts as working once it has held 60 for as long as we waited (a cooled phone keeps up for
+// a few minutes before it warms up again; judging it on its first seconds would flip back and forth).
+// 55, not lower: a phone that only manages 50-something has its graphics chip working flat out.
+const GUARD_WINDOW = 4000, GUARD_MIN_FPS = 55, GUARD_FPS = 30;
 const GUARD_RETRY = 5 * 60000, GUARD_RETRY_MAX = 40 * 60000;
 
 export function makePacer(state, applySize) {
@@ -36,7 +39,7 @@ export function makePacer(state, applySize) {
     const wants60 = state.preset.fps > GUARD_FPS && !state.idleFps;
     if (!wants60 || gap > 250) state.guardFrom = 0;
     if (wants60 && state.guard && now - state.guardT > state.guardWait && state.autoScale === 1 && state.slowFrames === 0) {
-      state.guard = false; state.guardRetry = true; state.guardFrom = 0; // been cool for a while: try 60 again
+      state.guard = false; state.guardRetry = true; state.guardT = now; state.guardFrom = 0; // been cool for a while: try 60 again
     }
     const fps = state.idleFps || (state.guard ? GUARD_FPS : state.preset.fps);
     const interval = 1000 / fps;
@@ -65,10 +68,11 @@ export function makePacer(state, applySize) {
       if (now - state.guardFrom >= GUARD_WINDOW) {
         const got = (state.guardFrames * 1000) / (now - state.guardFrom);
         if (got < GUARD_MIN_FPS) {
-          state.guard = true; state.guardT = now;
           if (state.guardRetry) state.guardWait = Math.min(state.guardWait * 2, GUARD_RETRY_MAX); // the try failed: wait longer
-        } else if (state.guardRetry) state.guardWait = GUARD_RETRY; // the try worked: back to the usual wait
-        state.guardRetry = false;
+          state.guard = true; state.guardT = now; state.guardRetry = false;
+        } else if (state.guardRetry && now - state.guardT > state.guardWait) {
+          state.guardWait = GUARD_RETRY; state.guardRetry = false; // held 60 as long as we waited: it really worked
+        }
         state.guardFrom = now; state.guardFrames = 0;
       }
     }
