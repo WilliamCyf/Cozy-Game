@@ -31,7 +31,8 @@ async function phone(name, locale = 'en-GB') {
 async function wrongWords(p, want) {
   return p.evaluate((want) => {
     const skip = '.lang-btn, .lang-pill, .seg-b.lang, .lang-pick, [data-noi18n], .code, .face, .logo-text, .island-name, .row-item .grow, .name-input';
-    const okLatin = /^(Cozy|Cove|fps|OK|PM|AM|Nok|Dad|Mum)$/; // (+ the test players' own names)
+    // (+ the test players' own names; and the language buttons' own names, which tips quote on purpose)
+    const okLatin = /^(Cozy|Cove|fps|OK|PM|AM|Nok|Dad|Mum|English)$/;
     const bad = [];
     const vis = (el) => el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden' && +getComputedStyle(el).opacity > 0.05;
     const tw = document.createTreeWalker(document.getElementById('ui'), NodeFilter.SHOW_TEXT);
@@ -39,7 +40,7 @@ async function wrongWords(p, want) {
       const el = n.parentElement, s = n.textContent.trim();
       if (!s || !vis(el) || el.closest(skip)) continue;
       if (want === 'th') { if ((s.match(/[A-Za-z]{2,}/g) || []).some((x) => !okLatin.test(x))) bad.push(s.slice(0, 60)); }
-      else if (/[฀-๿]/.test(s)) bad.push(s.slice(0, 60));
+      else if (/[\u0E00-\u0E7F]/.test(s.replace(/ภาษาไทย/g, ''))) bad.push(s.slice(0, 60));
     }
     return bad;
   }, want);
@@ -138,7 +139,7 @@ try {
   await c.evaluate(() => { const g = window.__game; const f = g.interact.fixed.find((x) => x.type === 'shop'); g.players.local.x = f.x; g.players.local.z = f.z; g.rig.snap(); });
   await wait(1200);
   const act = await c.$eval('.act-label', (e) => e.textContent);
-  check(/[฀-๿]/.test(act), `the big button speaks Thai at the shop ("${act}")`);
+  check(/[\u0E00-\u0E7F]/.test(act), `the big button speaks Thai at the shop ("${act}")`);
   for (const panel of ['menu', 'shop', 'help', 'journal', 'basket']) {
     await c.evaluate((n) => window.__game.openPanel(n), panel);
     await wait(700);
@@ -157,7 +158,7 @@ try {
   check(/ภาษาไทย/.test(await c.$eval('.lang-pill', (e) => e.textContent)), 'and the menu button now offers ภาษาไทย');
   await c.evaluate(() => window.__game.ui.closeSheet());
   await wait(1300);
-  check(!/[฀-๿]/.test(await c.$eval('.act-label', (e) => e.textContent)), 'the big button is English again');
+  check(!/[\u0E00-\u0E7F]/.test(await c.$eval('.act-label', (e) => e.textContent)), 'the big button is English again');
   await c.screenshot({ path: `${out}/4-back-en.png` });
 } catch (e) {
   console.error('TEST CRASHED', e);
