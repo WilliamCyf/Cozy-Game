@@ -440,7 +440,7 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
   .emotes { bottom: 150px; }
   .sheet { max-height: 92%; max-width: 620px; }
   .sheet.tall, .sheet.look { max-height: 94%; }
-  .sheet.look { max-width: 54%; margin-left: auto; } /* to the right, so you can see yourself on the left */
+  .sheet.look { max-width: 54%; margin-left: auto; padding-right: var(--safe-r); } /* to the right, so you can see yourself on the left (clear of the notch) */
   .catch-card { max-height: 94vh; overflow-y: auto; }
   .card-art { width: 48%; }
   .toasts { top: calc(var(--safe-t) + 92px); }

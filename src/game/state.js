@@ -6,6 +6,7 @@
 // The host makes the ops; every phone applies the same ops in the same order,
 // so all copies of the ledger stay identical.
 import { START_STATE, PROJECTS } from './data.js';
+import { shortText } from '../util/text.js';
 
 export const SAVE_KEY = 'cozycove.island.v1';
 export const SCHEMA = 1;
@@ -67,7 +68,7 @@ export function migrate(saved, fresh) {
   out.hats = Array.from(new Set([...(fresh.hats || []), ...(saved.hats || [])]));
   out.feed = Array.isArray(saved.feed) ? saved.feed.slice(-30) : [];
   out.stickers = Array.isArray(saved.stickers) ? saved.stickers : [];
-  out.name = typeof saved.name === 'string' && saved.name.trim() ? saved.name.slice(0, 24) : fresh.name;
+  out.name = typeof saved.name === 'string' && saved.name.trim() ? shortText(saved.name, 24) : fresh.name; // (24 letters, like a_rename)
   out.v = SCHEMA;
   return out;
 }

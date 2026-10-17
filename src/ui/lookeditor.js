@@ -2,7 +2,7 @@
 import { h, tapButton } from './dom.js';
 import { HATS, SKIN_TONES, SHIRT_COLORS, ACCENT_COLORS, HAIR_COLORS } from '../entities/character.js';
 import { t } from '../i18n/i18n.js';
-import { cleanName } from '../util/text.js';
+import { cleanName, limitLetters } from '../util/text.js';
 
 export const hatEmoji = (id) => ({ straw: '👒', sunhat: '🌸', cap: '🧢', beanie: '🧶', bunny: '🐰', cat: '🐱', frog: '🐸', chef: '👨‍🍳', pirate: '🏴‍☠️', flowers: '💐', crown: '👑' }[id] || '🎩');
 
@@ -10,7 +10,8 @@ export function buildLookEditor({ profile, ownedHats, onChange, onSave, saveLabe
   const look = { ...profile.look };
   let name = profile.name || '';
   const wrap = h('div', { class: 'look-editor' });
-  const input = h('input', { class: 'name-input', maxlength: 24, value: name, placeholder: t('Type your name'), autocomplete: 'off', autocorrect: 'off', autocapitalize: 'words', spellcheck: 'false', enterkeyhint: 'done' });
+  const input = h('input', { class: 'name-input', maxlength: 40, value: name, placeholder: t('Type your name'), autocomplete: 'off', autocorrect: 'off', autocapitalize: 'words', spellcheck: 'false', enterkeyhint: 'done' });
+  limitLetters(input, 12); // stops at 12 letters while typing (what is saved), Thai marks included
   input.addEventListener('input', () => { name = input.value; });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
   wrap.append(h('label', { class: 'field' }, h('span', {}, t('Name')), input));

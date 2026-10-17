@@ -45,12 +45,27 @@ try {
   pos = await onScreen(a);
   check(Math.abs(pos.y - 0.5) < 0.08 && Math.abs(pos.x - 0.5) < 0.08, `after closing My Look the view comes back to the middle (${(pos.x * 100).toFixed(0)}%, ${(pos.y * 100).toFixed(0)}%)`);
 
+  // the name box stops at 12 letters while typing (what gets saved), Thai tone marks don't count extra
+  await a.evaluate(() => window.__game.openPanel('look'));
+  await wait(700);
+  await a.fill('.sheet .name-input', '');
+  await a.type('.sheet .name-input', 'Grandpa Somchai', { delay: 20 });
+  check(await a.$eval('.sheet .name-input', (e) => e.value) === 'Grandpa Somc', 'typing a long name stops at 12 letters');
+  await a.fill('.sheet .name-input', '');
+  await a.type('.sheet .name-input', 'คุณตาสมศักดิ์', { delay: 20 });
+  check(await a.$eval('.sheet .name-input', (e) => e.value) === 'คุณตาสมศักดิ์', 'a Thai name of 9 letters (13 computer characters) fits whole');
+  await a.evaluate(() => window.__game.ui.closeSheet());
+  await wait(1500);
+
   // 2. renaming the island happens on the page itself (no pop-up box that pauses the game)
   await a.evaluate(() => window.__game.openPanel('family'));
   await wait(800);
+  // island news arrives at the very moment the button is tapped: the typing box must keep its keyboard
+  await a.evaluate(() => window.__game.onOps([['set', ['coins'], window.__game.session.state.coins]]));
   await a.getByRole('button', { name: /Name our island/ }).tap();
   await wait(400);
   check(!!(await a.$('.rename-input')), 'tapping "Name our island" shows a typing box on the page');
+  check(await a.evaluate(() => document.activeElement?.classList.contains('rename-input')), 'the typing box keeps the keyboard even when island news arrives at that moment');
   await a.fill('.rename-input', 'Sunny Island');
   // news arriving while typing must not wipe the box
   await a.evaluate(() => window.__game.session.request({ a: 'emote', e: 'wave' }) && window.__game.session.logic.ops([['set', ['coins'], window.__game.session.state.coins + 1]]));
@@ -126,6 +141,23 @@ try {
   });
   check(longest.right <= 375, `a long Thai label on the big button stays on screen (right edge ${Math.round(longest.right)})`);
   await c.screenshot({ path: `${out}/6-small-thai.png` });
+
+  // 6. a phone that can't save (storage full, or blocked in Safari settings) is told, even when the very first save fails
+  const d = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await d.addInitScript(() => {
+    const real = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) { if (String(k).startsWith('cozycove.island')) throw new DOMException('full', 'QuotaExceededError'); return real.call(this, k, v); };
+  });
+  const dp = await d.newPage();
+  dp.on('pageerror', (e) => errors.push(`[nosave] ${e.message}`));
+  await dp.goto(base + '&lang=en');
+  await dp.waitForFunction(() => window.__game?.session?.state, null, { timeout: 90000 });
+  let warned = false;
+  for (let i = 0; i < 40 && !warned; i++) { // (asked every quarter second, for up to 10 seconds)
+    warned = await dp.evaluate(() => [...document.querySelectorAll('.toast')].some((x) => /out of space/.test(x.textContent)));
+    if (!warned) await wait(250);
+  }
+  check(warned, 'a phone that cannot save is warned straight away');
 } catch (e) {
   console.error('TEST CRASHED', e);
   ok = false;

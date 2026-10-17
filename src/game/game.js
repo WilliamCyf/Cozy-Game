@@ -61,7 +61,9 @@ export class Game {
       // remember the new code, so coming back after an update finds the island again (host and guests)
       try { sessionStorage.setItem('cozycove.resume', JSON.stringify({ mode: session.role, code })); } catch { /* ignore */ }
     });
-    session.on('savefail', () => this.ui.toast(t('This phone is out of space, so the island couldn’t be saved. Free up some space on the iPhone.'), '💾', 7000));
+    const saveFailed = () => this.ui.toast(t('This phone is out of space, so the island couldn’t be saved. Free up some space on the iPhone.'), '💾', 7000);
+    session.on('savefail', saveFailed);
+    if (session.saveWarned) setTimeout(saveFailed, 1500); // (the very first save, before this game existed, already failed)
     session.on('lost', () => this.onLost());
     // The island opened in a second window (another Safari tab)? Then this window stops saving at once,
     // so the two windows never overwrite each other's progress.
@@ -104,7 +106,10 @@ export class Game {
     const sh = this.ui.sheet;
     if (sh && !(typeof sh.keep === 'function' ? sh.keep() : sh.keep) && ops.some((op) => SHEET_NEWS.has(op[1][0]))) {
       clearTimeout(this._refreshT);
-      this._refreshT = setTimeout(() => this.ui.refreshSheet(), 120);
+      this._refreshT = setTimeout(() => { // (asked again when it's time: the player may have started typing meanwhile)
+        const now = this.ui.sheet;
+        if (now && !(typeof now.keep === 'function' ? now.keep() : now.keep)) this.ui.refreshSheet();
+      }, 120);
     }
     void s;
   }

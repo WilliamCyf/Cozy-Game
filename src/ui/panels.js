@@ -1,5 +1,5 @@
 // What's inside each pop-up panel (basket, journal, family board, shop, cooking…).
-import { h, tapButton, firstLetter } from './dom.js';
+import { h, tapButton, firstLetter, focusAfterTap } from './dom.js';
 import { ITEMS, FISH, FISH_BY_ID, JOURNAL_FISH, RARITY, CROPS, RECIPES, SHOP, PROJECTS, PROJECT_BY_ID, STICKERS } from '../game/data.js';
 import { HATS } from '../entities/character.js';
 import { buildLookEditor, hatEmoji } from './lookeditor.js';
@@ -9,6 +9,7 @@ import { fishSVG } from './fishart.js';
 import { QUALITY } from '../render/renderer.js';
 import { canSpeak, speak, stopSpeaking } from '../audio/speech.js';
 import { t, tr, islandName, LANGS, getLang, versionText } from '../i18n/i18n.js';
+import { limitLetters } from '../util/text.js';
 
 // English labels (the keys); they are translated with t() where they are shown.
 const HAB_ICON = { shore: '🏖️ Beach', deep: '🌊 Deep sea', pond: '🌲 Forest pond', reef: '🐢 Turtle Islet', any: '💧 Anywhere' };
@@ -372,12 +373,13 @@ export function familyPanel(g) {
         b.append(h('div', { class: 'row' }, btn(t('✏️ Name our island'), () => {
           renaming = true;
           g.ui.refreshSheet();
-          b.querySelector('.rename-input')?.focus();
+          focusAfterTap(b.querySelector('.rename-input'));
         }, 'small ghost')));
       } else if (S.isHost) {
         // typed right here on the page (a phone pop-up box would pause the game for everyone while it is open)
         const shown = islandName(S.state.name);
-        const inp = h('input', { class: 'name-input rename-input', maxlength: 40, value: shown, autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'done' });
+        const inp = h('input', { class: 'name-input rename-input', maxlength: 80, value: shown, autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'done' });
+        limitLetters(inp, 24); // (the island keeps up to 24 letters)
         const done = async (save) => {
           if (!renaming) return;
           renaming = false;

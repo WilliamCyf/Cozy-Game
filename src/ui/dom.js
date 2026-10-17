@@ -36,6 +36,19 @@ export function tapButton(attrs, ...kids) {
   return el;
 }
 
+// Give a text box the keyboard from inside a button's tap. A moment after the tap, the phone also
+// sends an old-style "mouse press" for it, which lands on whatever is now under the finger and would
+// take the keyboard away again: that one press is ignored, and the box is given the keyboard again.
+export function focusAfterTap(input) {
+  if (!input) return;
+  input.focus();
+  const stop = (e) => { if (e.target !== input) e.preventDefault(); };
+  const again = () => { if (input.isConnected) input.focus(); };
+  document.addEventListener('mousedown', stop, true);
+  document.addEventListener('click', again, { capture: true, once: true });
+  setTimeout(() => { document.removeEventListener('mousedown', stop, true); document.removeEventListener('click', again, true); }, 700);
+}
+
 export function setText(el, text) {
   const s = String(text);
   if (el._t !== s) { el._t = s; el.textContent = s; }
