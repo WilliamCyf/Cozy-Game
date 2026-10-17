@@ -26,7 +26,7 @@ const key = async (page, k, ms) => { await page.keyboard.down(k); await wait(ms)
 try {
   if (scenario === 'title') {
     const p = await newPhone('A');
-    await p.goto(base + '?nosw');
+    await p.goto(base + '?nosw&lang=en');
     await wait(6000);
     await shot(p, 'title');
     await p.getByText('Play on our island').click();
@@ -176,7 +176,7 @@ try {
     }
   } else if (scenario === 'visual2') {
     const t = await newPhone('T');
-    await t.goto(base + '?nosw&nopeer&notry');
+    await t.goto(base + '?nosw&nopeer&notry&lang=en');
     await wait(5000);
     await t.getByText('Play on our island').click();
     await wait(2500);
@@ -251,7 +251,7 @@ try {
     await shot(p, 'shop-request2');
   } else if (scenario === 'landscape') {
     const t = await newPhone('T', true);
-    await t.goto(base + '?nosw&nopeer&notry');
+    await t.goto(base + '?nosw&nopeer&notry&lang=en');
     await wait(6000);
     await shot(t, 'land-title');
     const p = await newPhone('A', true);

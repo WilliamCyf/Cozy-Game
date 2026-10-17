@@ -42,8 +42,10 @@ export default {
 
   // ---- updates
   'Checking for updates…': 'กำลังตรวจหาอัปเดต…',
-  'Updating Cozy Cove…': 'กำลังอัปเดตเกม…',
   'You have the newest version!': 'เกมเป็นเวอร์ชันล่าสุดแล้ว!',
+  'A new version is on its way…': 'กำลังโหลดเวอร์ชันใหม่ให้นะ…',
+  'Cozy Cove was updated to the newest version!': 'อัปเดตเกมเป็นเวอร์ชันใหม่ล่าสุดแล้ว!',
+  '🔄 Update now': '🔄 อัปเดตเลย',
   'Couldn’t check right now.': 'ตอนนี้ยังตรวจไม่ได้ ไว้ลองใหม่นะ',
 
   // ---- fishing

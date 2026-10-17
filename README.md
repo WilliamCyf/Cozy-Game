@@ -53,8 +53,10 @@ Pick **one** option:
 ## 4. English and Thai · ภาษาไทย
 
 * A phone set to Thai starts the game **in Thai automatically**.
-* To switch: the **🇹🇭 ภาษาไทย / 🇬🇧 English** button at the top of the title screen, or
-  **☰ → Settings → Language**. Each phone chooses its own language, so Mum can play in Thai
+* The very first time the game is opened, it asks **"เลือกภาษา · Choose your language"**.
+* To switch later: the **🇹🇭 ภาษาไทย / 🇬🇧 English** button on the title screen, at the top of
+  the **☰ menu**, or in **☰ → Settings**. It switches instantly, even in the middle of a game
+  (nobody gets disconnected). Each phone chooses its own language, so Mum can play in Thai
   while the kids play in English on the same island — news like "Mia caught a Golden Koi!"
   shows up on every phone in that phone's language.
 
@@ -73,7 +75,21 @@ Pick **one** option:
 | 🧺 **Picnic** | Sit together on the picnic blanket (2+ people) for a small daily bonus. |
 | 🏝️ **Island name** | The host can name your island in ☰ → Family & Invite. |
 
-## 6. Cool phone, happy battery
+## 6. New versions (updates)
+
+Each phone keeps a copy of the game, so it opens instantly and even works without internet.
+When a new version is published:
+
+* **On the title screen** it updates by itself and says **"✨ Updated to the newest version!"**
+* **During a game** a small **"✨ New version ready · tap to update"** button appears — tap it
+  when it suits you; you go straight back into your game.
+* The version (date and time) is shown at the **bottom of the title screen** and in
+  **☰ → Settings**, so you can check that every phone has the same one.
+* Phones that still have a version from **before 17 Oct 2026** need one push: close the app
+  completely (swipe it up in the app switcher) and open it again. If the version at the bottom
+  of the title screen didn't change, wait a minute and do it once more.
+
+## 7. Cool phone, happy battery
 
 The game was built to stay cool:
 * It draws **30 pictures per second** (half the usual work) and never more pixels than needed.
@@ -121,6 +137,8 @@ Tests (Playwright, using local stand-ins for the matchmakers):
 node tests/play.mjs flow     # whole-game playthrough
 node tests/thai.mjs          # every screen in Thai: no English left, nothing cut off
 node tests/join-pictures.mjs # Mum joins from a Thai phone with a picture code
+node tests/lang-switch.mjs   # English phone -> Thai and back: title, menu, Settings, mid-game
+node tests/update.mjs        # new versions reach phones (pretend GitHub Pages, offline too)
 node tools/i18n-check.mjs    # every text has Thai, {placeholders} match
 node tests/mp.mjs both       # 4 players + a 5th who is turned away
 node tests/reconnect.mjs     # dropped connections and a sleeping host

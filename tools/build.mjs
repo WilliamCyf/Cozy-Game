@@ -20,8 +20,12 @@ function listFiles(dir) {
   return out;
 }
 
+// A short fingerprint of a file's contents: changes whenever the file changes.
+const fingerprint = (buf) => createHash('sha1').update(buf).digest('hex').slice(0, 10);
+
 async function buildOnce() {
   const t0 = Date.now();
+  const builtAt = new Date(); // shown in Settings, so you can see which version a phone has
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
 
@@ -34,7 +38,7 @@ async function buildOnce() {
     target: ['safari15'],
     write: false,
     legalComments: 'none',
-    define: { __DEV__: watch ? 'true' : 'false' },
+    define: { __DEV__: watch ? 'true' : 'false', __BUILT_AT__: JSON.stringify(builtAt.toISOString()) },
     logLevel: 'warning',
   });
   const js = result.outputFiles[0].contents;
@@ -60,11 +64,17 @@ async function buildOnce() {
   html = html.replace('/*%CSS%*/', cssMin).replace('%APP%', jsName).replace('<!--%SPLASH%-->', splash);
   writeFileSync(join(OUT, 'index.html'), html);
 
-  // Service worker: list every file so the game works offline after the first visit.
-  const files = listFiles(OUT).map((f) => './' + relative(OUT, f).split('\\').join('/'));
+  // Service worker: list every file (with its fingerprint) so the game works offline after the
+  // first visit, and an update only downloads the files that really changed.
+  const files = {};
+  for (const f of listFiles(OUT)) {
+    const url = './' + relative(OUT, f).split('\\').join('/');
+    if (url === './.nojekyll' || url.endsWith('.txt')) continue;
+    files[url === './index.html' ? './' : url] = fingerprint(readFileSync(f));
+  }
   const version = createHash('sha1').update(js).update(html).digest('hex').slice(0, 10);
   let sw = readFileSync(join(ROOT, 'src/sw.js'), 'utf8');
-  sw = sw.replace('%VERSION%', version).replace('%FILES%', JSON.stringify(['./', ...files.filter((f) => f !== './index.html')]));
+  sw = sw.replace('%VERSION%', version).replace('%FILES%', JSON.stringify(files));
   writeFileSync(join(OUT, 'sw.js'), sw);
   writeFileSync(join(OUT, '.nojekyll'), '');
 

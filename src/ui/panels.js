@@ -7,7 +7,8 @@ import { prettyCode } from './screens.js';
 import { splitCode } from '../net/transport.js';
 import { fishSVG } from './fishart.js';
 import { QUALITY } from '../render/renderer.js';
-import { t, tr, islandName, LANGS, getLang } from '../i18n/i18n.js';
+import { canSpeak, speak, stopSpeaking } from '../audio/speech.js';
+import { t, tr, islandName, LANGS, getLang, versionText } from '../i18n/i18n.js';
 
 // English labels (the keys); they are translated with t() where they are shown.
 const HAB_ICON = { shore: '🏖️ Beach', deep: '🌊 Deep sea', pond: '🌲 Forest pond', reef: '🐢 Turtle Islet', any: '💧 Anywhere' };
@@ -50,8 +51,10 @@ const timeText = (f) => (TIME_ICON[f.time] ? ' · ' + t(TIME_ICON[f.time]) : '')
 // ---------------------------------------------------------------- menu
 export function menuPanel(g) {
   g.ui.openSheet({
-    title: t('Menu'), icon: '🏝️',
+    title: () => t('Menu'), icon: '🏝️',
     build: (b) => {
+      const other = LANGS.find((L) => L.id !== getLang());
+      b.append(h('div', { class: 'menu-lang' }, tapButton({ class: 'lang-pill', ontap: () => g.changeLang(other.id) }, `${other.flag} ${other.label}`)));
       const tile = (ic, label, fn) => tapButton({ class: 'tile', ontap: fn }, h('span', { class: 'tile-ic' }, ic), h('span', {}, label));
       b.append(h('div', { class: 'tiles' },
         tile('🧺', t('Basket'), () => g.openPanel('basket')),
@@ -71,7 +74,7 @@ export function menuPanel(g) {
 // ---------------------------------------------------------------- basket
 export function basketPanel(g) {
   g.ui.openSheet({
-    title: t('Family Basket'), icon: '🧺',
+    title: () => t('Family Basket'), icon: '🧺',
     build: (b) => {
       const s = g.session.state;
       b.append(h('div', { class: 'jar' }, h('span', { class: 'big' }, '🪙'), h('div', {}, h('b', {}, t('{n} coins', { n: s.coins })), h('small', {}, t('in the family jar')))));
@@ -103,7 +106,7 @@ export function basketPanel(g) {
 // ---------------------------------------------------------------- journal
 export function journalPanel(g, tab = 'fish') {
   g.ui.openSheet({
-    title: t('Fish Journal'), icon: '📖', cls: 'tall',
+    title: () => t('Fish Journal'), icon: '📖', cls: 'tall',
     build: (b, close) => {
       const s = g.session.state;
       const found = JOURNAL_FISH.filter((f) => s.journal[f.id]).length;
@@ -150,7 +153,7 @@ const stat = (ic, n, label) => h('div', { class: 'stat' }, h('span', { class: 'i
 function fishDetail(g, id) {
   const f = FISH_BY_ID[id], j = g.session.state.journal[id], r = RARITY[f.rar];
   g.ui.openSheet({
-    title: t(f.name), icon: '🐟',
+    title: () => t(f.name), icon: '🐟',
     build: (b) => {
       b.append(h('div', { class: 'detail-art', html: fishSVG(id) }));
       b.append(h('div', { class: 'detail' },
@@ -167,7 +170,7 @@ function fishDetail(g, id) {
 // ---------------------------------------------------------------- family board (projects)
 export function boardPanel(g, focus) {
   g.ui.openSheet({
-    title: t('Family Board'), icon: '📋', cls: 'tall',
+    title: () => t('Family Board'), icon: '📋', cls: 'tall',
     build: (b) => {
       const s = g.session.state;
       b.append(h('p', { class: 'lead' }, t('Fix up the island together! Everyone can chip in from the family basket.')));
@@ -215,7 +218,7 @@ export function boardPanel(g, focus) {
 // ---------------------------------------------------------------- shop
 export function shopPanel(g, tab = 'seeds') {
   g.ui.openSheet({
-    title: t('Captain Shelly’s Shop'), icon: '🐢', cls: 'tall',
+    title: () => t('Captain Shelly’s Shop'), icon: '🐢', cls: 'tall',
     build: (b, close) => {
       const s = g.session.state;
       b.append(h('div', { class: 'shop-top' }, h('span', {}, t('"Ahoy, little islanders! What’ll it be?"')), h('b', {}, `🪙 ${s.coins}`)));
@@ -271,7 +274,7 @@ function wearHat(g, hat) {
 // ---------------------------------------------------------------- sell (market crate)
 export function sellPanel(g) {
   g.ui.openSheet({
-    title: t('Market Crate'), icon: '🪙', cls: 'tall',
+    title: () => t('Market Crate'), icon: '🪙', cls: 'tall',
     build: (b) => {
       const s = g.session.state;
       b.append(h('p', { class: 'lead' }, t('Put things in the crate and coins go into the family jar.')));
@@ -295,7 +298,7 @@ export function sellPanel(g) {
 // ---------------------------------------------------------------- cooking
 export function cookPanel(g) {
   g.ui.openSheet({
-    title: t('Campfire Kitchen'), icon: '🍳', cls: 'tall',
+    title: () => t('Campfire Kitchen'), icon: '🍳', cls: 'tall',
     build: (b) => {
       const s = g.session.state;
       b.append(h('p', { class: 'lead' }, t('Cook yummy dishes! They sell for more and help with family projects.')));
@@ -320,7 +323,7 @@ export function cookPanel(g) {
 // ---------------------------------------------------------------- planting
 export function plantPanel(g, plot) {
   g.ui.openSheet({
-    title: t('Plant Seeds'), icon: '🌱',
+    title: () => t('Plant Seeds'), icon: '🌱',
     build: (b, close) => {
       const s = g.session.state;
       const seeds = Object.keys(CROPS).filter((c) => (s.basket['seed:' + c] || 0) > 0);
@@ -341,11 +344,14 @@ export function plantPanel(g, plot) {
 // ---------------------------------------------------------------- mail
 export function letterPanel(g, letter) {
   g.ui.openSheet({
-    title: t('A letter!'), icon: '✉️',
+    title: () => t('A letter!'), icon: '✉️',
+    onClose: stopSpeaking,
     build: (b, close) => {
       const gifts = Object.entries(letter.gift).map(([k, n]) => k === 'coins' ? `🪙 ${n}` : `${ITEMS[k].kind === 'seed' ? ITEMS[k].cropEmoji : ITEMS[k].emoji} ×${n}`).join('  ');
       b.append(h('div', { class: 'letter' }, h('p', {}, tr(letter.text)), h('p', { class: 'from' }, '— ' + tr(letter.from)), h('div', { class: 'gift' }, '🎁 ', gifts)));
-      b.append(btn(t('Thank you! 💛'), close, 'primary'));
+      b.append(h('div', { class: 'row' },
+        canSpeak() ? btn(t('🔊 Read to me'), () => speak(`${tr(letter.text)} … ${tr(letter.from)}`), 'ghost') : null,
+        btn(t('Thank you! 💛'), close, 'primary')));
     },
   });
 }
@@ -353,7 +359,7 @@ export function letterPanel(g, letter) {
 // ---------------------------------------------------------------- family & invite
 export function familyPanel(g) {
   g.ui.openSheet({
-    title: t('Family & Invite'), icon: '👨‍👩‍👧‍👦',
+    title: () => t('Family & Invite'), icon: '👨‍👩‍👧‍👦',
     build: (b) => {
       const S = g.session;
       const code = S.code || '';
@@ -393,7 +399,7 @@ export function familyPanel(g) {
 export function lookPanel(g) {
   g.previewLook(true);
   g.ui.openSheet({
-    title: t('My Look'), icon: '👕', cls: 'look',
+    title: () => t('My Look'), icon: '👕', cls: 'look',
     onClose: () => g.previewLook(false),
     build: (b, close) => {
       b.append(buildLookEditor({
@@ -410,15 +416,14 @@ export function lookPanel(g) {
 // ---------------------------------------------------------------- settings
 export function settingsPanel(g) {
   g.ui.openSheet({
-    title: t('Settings'), icon: '⚙️', cls: 'tall',
+    title: () => t('Settings'), icon: '⚙️', cls: 'tall',
     build: (b) => {
       const st = g.settings;
       // language: each button shows its own name ("🇹🇭 ภาษาไทย"), so anyone can find theirs
       const cur = getLang();
       b.append(h('h3', {}, t('Language')));
-      b.append(h('div', { class: 'seg' }, LANGS.map((L) => tapButton({ class: 'seg-b' + (cur === L.id ? ' on' : ''), ontap: () => {
-        if (L.id === getLang()) return;
-        if (g.changeLang) g.changeLang(L.id); else window.__changeLang?.(L.id);
+      b.append(h('div', { class: 'seg' }, LANGS.map((L) => tapButton({ class: 'seg-b lang' + (cur === L.id ? ' on' : ''), ontap: () => {
+        if (L.id !== getLang()) g.changeLang(L.id); // the whole screen, this page too, switches at once
       } }, `${L.flag} ${L.label}`))));
       b.append(h('h3', {}, t('Graphics')));
       b.append(h('p', { class: 'lead small' }, t('Lower settings keep the phone cooler and the battery happier.')));
@@ -443,6 +448,7 @@ export function settingsPanel(g) {
         }, 'danger small'));
       }
       b.append(h('p', { class: 'about' }, t('Cozy Cove · made with love for families 💛')));
+      b.append(h('p', { class: 'about small' }, t('Version: {when}', { when: versionText() })));
     },
   });
 }
@@ -450,7 +456,7 @@ export function settingsPanel(g) {
 // ---------------------------------------------------------------- help
 export function helpPanel(g) {
   g.ui.openSheet({
-    title: t('How to Play'), icon: '❓', cls: 'tall',
+    title: () => t('How to Play'), icon: '❓', cls: 'tall',
     build: (b) => {
       const tip = (ic, title, text) => h('div', { class: 'tip' }, h('span', { class: 'big-ic' }, ic), h('div', {}, h('b', {}, title), h('p', {}, text)));
       b.append(
@@ -463,6 +469,8 @@ export function helpPanel(g) {
         tip('🧺', t('Shared basket'), t('Everything anyone finds goes into ONE family basket. Coins go into the family jar.')),
         tip('👨‍👩‍👧‍👦', t('Play together'), t('One phone taps "Play on our island". Others tap "Join Family", tap the island’s picture and type its 3 numbers. Up to 4 players!')),
         tip('✉️', t('Every day'), t('Check the mailbox each morning for a gift, and dig for treasure on Turtle Islet!')),
+        tip('🌐', t('Language'), t('Tap 🇹🇭 ภาษาไทย / 🇬🇧 English at the top of the menu ☰. Every phone can use its own language.')),
+        tip('🔊', t('Read to me'), t('Letters and messages in bottles have a 🔊 button: the phone reads them out loud.')),
       );
     },
   });
@@ -470,7 +478,7 @@ export function helpPanel(g) {
 
 export function leavePanel(g) {
   g.ui.openSheet({
-    title: t('Leave the island?'), icon: '🚪',
+    title: () => t('Leave the island?'), icon: '🚪',
     build: (b, close) => {
       b.append(h('p', { class: 'lead' }, g.session.isHost ? t('Your island is saved on this phone. If family members are playing, they’ll be sent back to the menu.') : t('You can come back any time with the island code.')));
       b.append(h('div', { class: 'row' }, btn(t('Stay'), close, 'ghost'), btn(t('Leave'), () => { close(); g.leave(); }, 'primary')));

@@ -86,9 +86,15 @@ try {
   // ---------------------------------------------------------------- 1. first launch on a Thai phone
   const p = await phone('Mum');
   await p.goto(base + '?nosw&nopeer&notry&debug');
-  await p.waitForSelector('.screen.title', { timeout: 90000 });
+  // brand-new phone: first the "choose your language" screen (written in both languages)
+  await p.waitForSelector('.lang-screen', { timeout: 90000 });
+  await wait(900);
+  console.log('language suggested automatically:', await p.evaluate(() => window.__i18n.getLang()));
+  await inspect(p, '00-choose-language');
+  const thIdx = await p.$$eval('.lang-pick .btn', (els) => els.findIndex((e) => /ภาษาไทย/.test(e.textContent)));
+  await (await p.$$('.lang-pick .btn'))[thIdx].tap();
+  await p.waitForSelector('.screen.title', { timeout: 30000 });
   await wait(1500);
-  console.log('language chosen automatically:', await p.evaluate(() => window.__i18n.getLang()));
   await inspect(p, '01-title');
   await p.tap('.title-buttons .btn.primary');
   await wait(1200);
@@ -137,7 +143,21 @@ try {
     await wait(400);
   };
   await goAndAct('20-plant', () => { const g = window.__game, pl = g.world.plots[3]; g.players.local.x = pl.x; g.players.local.z = pl.z + 1.4; g.players.local.heading = Math.PI; g.rig.snap(); });
-  await goAndAct('21-mailbox', () => { const g = window.__game; g.players.local.x = 9.5; g.players.local.z = 25.4; g.rig.snap(); });
+  // the letter: also try "🔊 Read to me" (we listen in on what the phone is asked to say)
+  await p.evaluate(() => { window.__spoke = null; if (window.speechSynthesis) window.speechSynthesis.speak = (u) => { window.__spoke = { text: u.text, lang: u.lang }; }; });
+  await p.evaluate(() => { const g = window.__game; g.players.local.x = 9.5; g.players.local.z = 25.4; g.rig.snap(); });
+  await wait(900);
+  await p.keyboard.down(' '); await wait(120); await p.keyboard.up(' ');
+  await wait(1400);
+  await inspect(p, '21-mailbox');
+  const readIdx = await p.$$eval('.sheet .btn', (els) => els.findIndex((e) => e.textContent.includes('🔊')));
+  if (readIdx >= 0) { await (await p.$$('.sheet .btn'))[readIdx].tap(); await wait(300); }
+  const spoke = await p.evaluate(() => window.__spoke);
+  const readOk = !!spoke && spoke.lang === 'th-TH' && /[\u0E00-\u0E7F]/.test(spoke.text);
+  console.log(`read aloud: ${readOk ? 'OK' : 'PROBLEM'} ${JSON.stringify(spoke)}`);
+  if (!readOk) report.push({ step: '21-read-aloud', english: [], overflow: ['the letter was not read aloud in Thai'] });
+  await p.evaluate(() => window.__game.ui.closeSheet?.());
+  await wait(400);
 
   // ---------------------------------------------------------------- fishing, start to finish
   await p.evaluate(() => { const g = window.__game, L = g.players.local; L.x = 24; L.z = 56.5; L.heading = 0; g.rig.snap(); });

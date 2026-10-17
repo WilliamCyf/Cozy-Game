@@ -71,6 +71,20 @@ try {
   const mumToasts = await mum.evaluate(() => [...document.querySelectorAll('.toast')].map((x) => x.textContent));
   check(mumToasts.some((x) => /Smith Island/.test(x) && /[฀-๿]/.test(x)), `Mum gets the news in Thai: ${JSON.stringify(mumToasts)}`);
   await mum.screenshot({ path: `${out}/mum-in-game.png` });
+  // Dad (the host) switches his phone to Thai in the middle of the game: nobody may be disconnected
+  await host.evaluate(() => { window.__notReloaded = true; window.__game.openPanel('settings'); });
+  await wait(800);
+  const thIdx = await host.$$eval('.seg-b.lang', (els) => els.findIndex((e) => /ภาษาไทย/.test(e.textContent)));
+  await (await host.$$('.seg-b.lang'))[thIdx].tap();
+  await wait(5000);
+  const after = await host.evaluate(() => ({ th: window.__i18n.getLang() === 'th', same: window.__notReloaded === true, online: window.__game.session.online.size }));
+  const mumOk = await mum.evaluate(() => ({ connected: window.__game.session.connected, lost: !document.querySelector('.overlay')?.classList.contains('hidden') }));
+  check(after.th && after.same && after.online === 2 && mumOk.connected && !mumOk.lost, `host switched to Thai mid-game: no reload, Mum stays connected (${JSON.stringify({ ...after, ...mumOk })})`);
+  check(await mum.evaluate(() => window.__i18n.getLang()) === 'th' && await host.evaluate(() => window.__i18n.getLang()) === 'th', 'each phone keeps its own language choice');
+  await host.evaluate(() => window.__game.ui.closeSheet());
+  await host.evaluate(() => { const g = window.__game, m = [...g.players.remotes.values()][0]; if (m) { g.players.local.x = m.x + 1.2; g.players.local.z = m.z + 1.5; g.rig.snap(); g.rig.setZoom(1.5); } });
+  await wait(1500);
+  await host.screenshot({ path: `${out}/host-sees-mum-tag.png` });
 
   // a wrong number goes back to the join screen with her picture still chosen
   const kid = await phone('Kid', 'th-TH');

@@ -6,6 +6,7 @@ import { FS } from '../game/fishing.js';
 import { BAITS, FISH_BY_ID, RARITY, ITEMS, JOURNAL_FISH } from '../game/data.js';
 import { fishSVG } from './fishart.js';
 import { t, tr, hasThai } from '../i18n/i18n.js';
+import { canSpeak, speak, stopSpeaking } from '../audio/speech.js';
 
 // Text handed over by other parts of the game (button labels, fishing hints, messages) may be a T()
 // message, plain English (translated here) or already translated (left as it is).
@@ -24,7 +25,6 @@ export class UI {
     this.sheet = null;
     this.toasts = [];
     this.cardOpen = false;
-    this.lastAction = null;
     this.hud = h('div', { class: 'hud' });
     root.appendChild(this.hud);
     this.build();
@@ -134,9 +134,8 @@ export class UI {
       if (tg) { ic = tg.icon; label = tg.label; dim = !!tg.dim; kind = tg.type; }
       else { ic = '👣'; label = 'Explore'; dim = true; kind = 'none'; }
     }
-    const key = ic + '|' + label + '|' + dim;
-    if (key !== this.lastAction) {
-      this.lastAction = key;
+    if (ic !== this._actIc || label !== this._actLabel || dim !== this._actDim) { // (no new strings every frame)
+      this._actIc = ic; this._actLabel = label; this._actDim = dim;
       setText(this.actIcon, ic);
       setText(this.actLabel, say(label)); // translated only when the label changes
       this.action.classList.toggle('dim', dim);
@@ -153,7 +152,10 @@ export class UI {
     }
     // fishing meters
     this.power.classList.toggle('hidden', fs !== FS.CHARGE);
-    if (fs === FS.CHARGE) this.power.firstChild.style.transform = `scaleY(${g.fishing.power.toFixed(3)})`;
+    if (fs === FS.CHARGE) {
+      const pw = Math.round(g.fishing.power * 100); // only touch the meter when it really moved
+      if (pw !== this._pw) { this._pw = pw; this.power.firstChild.style.transform = `scaleY(${pw / 100})`; }
+    }
     const reeling = fs === FS.REEL;
     this.reel.classList.toggle('hidden', !reeling);
     this.action.classList.toggle('reeling', reeling);
@@ -171,6 +173,23 @@ export class UI {
       if (mg.hint !== this._reelHint) { this._reelHint = mg.hint; setText(this.reel.firstChild, say(mg.hint)); }
       this.reel.firstChild.classList.toggle('warn', mg.pulling);
     }
+  }
+
+  // The language changed: rewrite every label on screen in the new language, right away.
+  relabel() {
+    this._day = null; this._clockKey = null; this._actLabel = null; this._reelHint = null; this._hintIn = null; this._hint = null;
+    for (const [el, key] of [[this.menuBtn, 'Menu'], [this.action, 'Action'], [this.emoteBtn, 'Emotes'], [this.basketBtn, 'Basket'], [this.journalBtn, 'Fish journal']]) el.setAttribute('aria-label', t(key));
+    if (this.updatePill) setText(this.updatePill.lastChild, t('New version ready · tap to update'));
+    this.refreshSheet(); // an open panel (e.g. Settings) is redrawn in the new language too
+    this.update();
+  }
+
+  // A new version of the game has arrived: a small button to switch to it when it suits the player.
+  updateReady(apply) {
+    if (this.updatePill) return;
+    this.updatePill = tapButton({ class: 'update-pill', ontap: () => { this.updatePill.classList.add('busy'); apply(); } }, h('span', { class: 'ic' }, '✨'), h('span', {}, t('New version ready · tap to update')));
+    this.toastBox.prepend(this.updatePill); // at the top of the message column, messages stack below
+    requestAnimationFrame(() => this.updatePill.classList.add('in'));
   }
 
   biteAlert(on) {
@@ -226,14 +245,17 @@ export class UI {
     this.toggleEmotes(false);
     const body = h('div', { class: 'sheet-body' });
     const close = () => this.closeSheet();
+    // title: text, or a little function that makes it (so the title can be redrawn in a new language)
+    const titleText = () => (typeof title === 'function' ? title() : title);
+    const titleEl = h('span', {}, titleText());
     const panel = h('div', { class: 'sheet ' + cls },
-      h('div', { class: 'sheet-head' }, h('div', { class: 'sheet-title' }, icon ? h('span', { class: 'ic' }, icon) : null, title), tapButton({ class: 'x', 'aria-label': t('Close'), ontap: close }, '✕')),
+      h('div', { class: 'sheet-head' }, h('div', { class: 'sheet-title' }, icon ? h('span', { class: 'ic' }, icon) : null, titleEl), tapButton({ class: 'x', 'aria-label': t('Close'), ontap: close }, '✕')),
       body);
     const back = h('div', { class: 'sheet-back' });
     back.addEventListener('pointerdown', (e) => { if (e.target === back) close(); });
     back.appendChild(panel);
     this.root.appendChild(back);
-    this.sheet = { back, body, onClose, refresh: () => { const y = body.scrollTop; body.innerHTML = ''; build(body, close); body.scrollTop = y; } };
+    this.sheet = { back, body, onClose, refresh: () => { setText(titleEl, titleText()); const y = body.scrollTop; body.innerHTML = ''; build(body, close); body.scrollTop = y; } };
     build(body, close);
     requestAnimationFrame(() => back.classList.add('in'));
     this.game.audio.ui('open');
@@ -278,8 +300,11 @@ export class UI {
       if (res?.record) badges.push(h('span', { class: 'badge rec' }, t('Family record!')));
     }
     this.closeCatch?.();
+    let autoClose = null;
     const close = () => {
       if (!card.isConnected || card.classList.contains('closing')) return;
+      clearTimeout(autoClose);
+      if (extra === 'bottle') stopSpeaking();
       this.cardOpen = false;
       this.closeCatch = null;
       card.classList.add('closing');
@@ -290,12 +315,14 @@ export class UI {
     const card = h('div', { class: 'catch' }, h('div', { class: 'catch-card' },
       h('div', { class: 'catch-top' }, t('You caught…')),
       art, h('div', { class: 'catch-name' }, title), h('div', { class: 'catch-sub' }, sub), h('div', { class: 'badges' }, badges),
-      tapButton({ class: 'btn primary', ontap: close }, extra === 'bottle' ? t('Aww 💛') : t('Yay! 🎉'))));
+      h('div', { class: 'row' },
+        extra === 'bottle' && canSpeak() ? tapButton({ class: 'btn ghost', ontap: () => { clearTimeout(autoClose); speak(sub); } }, t('🔊 Read to me')) : null,
+        tapButton({ class: 'btn primary', ontap: close }, extra === 'bottle' ? t('Aww 💛') : t('Yay! 🎉')))));
     card.firstChild.addEventListener('pointerdown', (e) => { e.stopPropagation(); close(); });
     this.root.appendChild(card);
     this.cardOpen = true;
     requestAnimationFrame(() => card.classList.add('in'));
-    setTimeout(close, extra === 'bottle' ? 9000 : 5000);
+    autoClose = setTimeout(close, extra === 'bottle' ? 9000 : 5000); // (reading aloud keeps it open)
     if (res?.isNew) g.fx.sparkle(g.players.local.x, g.players.local.y + 1, g.players.local.z, 16);
   }
 

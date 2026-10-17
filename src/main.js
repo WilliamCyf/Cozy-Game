@@ -1,4 +1,5 @@
 // Cozy Cove — app start-up and the main loop.
+import './util/polyfills.js';
 import './render/three-setup.js';
 import * as THREE from 'three';
 import { createRenderer } from './render/renderer.js';
@@ -16,7 +17,7 @@ import { Screens } from './ui/screens.js';
 import { loadIsland } from './game/state.js';
 import { clamp } from './util/math.js';
 import * as L from './world/layout.js';
-import { getLang, setLang, t, tr, hasThai } from './i18n/i18n.js';
+import { getLang, setLang, t, tr, hasThai, BUILD_ID } from './i18n/i18n.js';
 
 const params = new URLSearchParams(location.search);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -67,6 +68,7 @@ const settings = loadSettings();
 let previewChar = null;
 
 function fatal(msg) {
+  window.__booted = true; // (we got far enough to explain the problem: the loading-screen check stays quiet)
   console.error(msg);
   const m = document.getElementById('boot-msg');
   if (m) m.innerHTML = msg;
@@ -119,28 +121,41 @@ async function boot() {
     bootEl.classList.add('hide');
     setTimeout(() => bootEl.remove(), 600);
   }, 250);
+  window.__booted = true;
+  try { sessionStorage.removeItem('cozycove.bootRetry'); } catch { /* ignore */ } // the game started fine
   // came back after an update/reload while playing? jump straight back in
   const resume = (() => { try { return JSON.parse(sessionStorage.getItem('cozycove.resume') || 'null'); } catch { return null; } })();
   const auto = params.get('autostart');
   if (auto === 'host' || resume?.mode === 'host') startHost();
   else if (params.get('join') || resume?.mode === 'guest') { const code = params.get('join') || resume.code; screens.connecting(code); startJoin(code); }
+  else if (firstVisit) screens.langChooser((id) => changeLang(id)); // very first time: pick a language
   else showTitle();
+  if (justUpdated) setTimeout(() => (game ? game.ui.toast(t('Cozy Cove was updated to the newest version!'), '✨', 3200) : screens.flash(t('✨ Updated to the newest version!'))), game ? 4500 : 900);
 }
 
-// Switch language (from the title screen or Settings). In the middle of a game we save and
-// reload, and the game jumps straight back in, so every label is rebuilt in the new language.
+// Brand-new phone (never played, never chose a language)? Then the first screen asks for the
+// language in both languages, so a Thai reader on an English iPhone can still find Thai.
+const firstVisit = !store.get('cozycove.settings', {}).lang && !profile.name && !loadIsland() && !params.has('lang');
+// Did this phone just get a new version? (we say so, so everyone knows the update worked)
+const justUpdated = (() => {
+  const before = store.get('cozycove.build', null);
+  store.set('cozycove.build', BUILD_ID);
+  return !!before && before !== BUILD_ID;
+})();
+
+// Switch language (title screen, menu or Settings). It happens instantly: every label on screen is
+// rewritten in place. No reload, so nobody on the island gets disconnected.
 function changeLang(id) {
   settings.lang = id;
   store.set('cozycove.settings', settings);
   setLang(id);
-  if (game) {
-    if (game.session?.isHost) game.session.save();
-    location.reload();
-  } else showTitle();
+  if (game) game.relabel();
+  else showTitle();
 }
-window.__changeLang = changeLang; // used by the Settings panel
+window.__changeLang = changeLang; // used by the Settings panel and the menu
 
 function showTitle() {
+  if (updateWaiting && !game) { applyUpdate(); return; } // a new version arrived while on another screen
   const saved = loadIsland();
   screens.title(saved ? { day: saved.day, fish: Object.keys(saved.journal || {}).length, name: saved.name } : null);
 }
@@ -168,6 +183,7 @@ function startGame(session) {
   rig.setZoom(1);
   try { sessionStorage.setItem('cozycove.resume', JSON.stringify({ mode: session.role, code: session.code })); } catch { /* ignore */ }
   window.__game = game;
+  if (updateWaiting) game.ui.updateReady(() => applyUpdate()); // a new version arrived before the game started
 }
 function startHost() {
   const session = makeSession();
@@ -188,6 +204,8 @@ async function startJoin(code) {
     // a "no" from the host arrives as a message object (or English text from an older host): show it in this phone's language
     const msg = tr(e?.kick?.msg) || t('Couldn’t find that island. Check the code, and make sure Cozy Cove is open on the host’s phone (same Wi-Fi works best).');
     screens.join(code, msg);
+    if (e?.kick?.why === 'version') checkForUpdate(true); // maybe this phone is the old one: fetch the new version
+
   }
 }
 
@@ -252,11 +270,57 @@ function setupLifecycle() {
   window.addEventListener('pagehide', () => { if (game?.session?.isHost) game.session.save(); });
 }
 
+// ---------------------------------------------------------------- updates
+// The service worker keeps a copy of the game on the phone. When a new version is published,
+// the phone fetches it in the background, then we switch to it at a good moment:
+// straight away when nobody is playing, or when the player taps "Update" during a game.
+let swReg = null, lastUpdateCheck = 0, updateWaiting = false;
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   if (location.protocol !== 'https:' && location.hostname !== 'localhost') return;
   if (params.has('nosw')) return;
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
+  const hadCopy = !!navigator.serviceWorker.controller; // no copy yet = very first visit, nothing to update
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => { swReg = reg; }).catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadCopy) newVersionReady(); });
+  // iPhones keep the app paused in the background instead of restarting it, so look for a new
+  // version every time the game comes back on screen (one tiny file, at most once a minute)
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
 }
+function checkForUpdate(force = false) {
+  const now = Date.now();
+  if (!swReg || (!force && now - lastUpdateCheck < 60000)) return Promise.resolve(swReg);
+  lastUpdateCheck = now;
+  return swReg.update().then(() => swReg, () => swReg);
+}
+window.__checkForUpdate = checkForUpdate;
+async function newVersionReady() {
+  if (updateWaiting) return;
+  // Already running the newest copy? (happens when the page itself loaded the new version first)
+  const files = await askCopyForFiles();
+  const me = document.querySelector('script[type="module"][src*="app."]')?.getAttribute('src');
+  if (files && me && ('./' + me.replace(/^\.\//, '')) in files) return;
+  if (updateWaiting) return;
+  updateWaiting = true;
+  if (game) game.ui.updateReady(() => applyUpdate()); // playing: a little "Update" button
+  else if (!screens?.kind || screens.kind === 'title') applyUpdate(); // on the title: switch now
+  // (on any other screen, e.g. typing a name or an island code, it waits for the title or the game)
+}
+// Ask the phone's (new) copy which files it holds. Old copies don't answer: then we can't tell.
+function askCopyForFiles() {
+  return new Promise((resolve) => {
+    const copy = navigator.serviceWorker.controller;
+    if (!copy || typeof MessageChannel === 'undefined') { resolve(null); return; }
+    const ch = new MessageChannel();
+    const timer = setTimeout(() => resolve(null), 2000);
+    ch.port1.onmessage = (e) => { clearTimeout(timer); resolve(e.data && typeof e.data === 'object' ? e.data : null); };
+    try { copy.postMessage('which-files', [ch.port2]); } catch { clearTimeout(timer); resolve(null); }
+  });
+}
+function applyUpdate() {
+  if (game?.session?.isHost) game.session.save();
+  // (the resume note in sessionStorage brings a player straight back into their game)
+  location.reload();
+}
+window.__applyUpdate = applyUpdate;
 
 boot();

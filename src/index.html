@@ -33,6 +33,13 @@
   <script>/* Thai phone? show the loading message in Thai (same choice as src/i18n/i18n.js) */(function(){try{var l=new URLSearchParams(location.search).get('lang')||JSON.parse(localStorage.getItem('cozycove.settings')||'{}').lang||((navigator.languages||[]).concat(navigator.language||'').some(function(x){return /^th\b/i.test(x)})?'th':'en');if(l==='th'){document.documentElement.lang='th';document.getElementById('boot-msg').textContent='กำลังจัดตะกร้าปิกนิก…'}}catch(e){}})()</script>
 </div>
 <noscript>Cozy Cove needs JavaScript turned on.<br>ต้องเปิด JavaScript ก่อนนะ ถึงจะเล่นเกมนี้ได้</noscript>
-<script type="module" src="%APP%"></script>
+<script>
+/* If the game file can't load (e.g. a leftover old page pointing at a file that was replaced),
+   try once more by itself, then offer a button. Written in both languages. */
+function __bootFail(){try{if(!sessionStorage.getItem('cozycove.bootRetry')){sessionStorage.setItem('cozycove.bootRetry','1');location.reload();return}}catch(e){}
+var m=document.getElementById('boot-msg');if(m){m.innerHTML='Couldn\u2019t load the game · โหลดเกมไม่ได้<br><button type="button" class="boot-retry" onclick="location.reload()">Tap to try again · แตะเพื่อลองใหม่</button>'}}
+setTimeout(function(){var b=document.getElementById('boot');if(b&&!b.classList.contains('hide')&&!window.__booted)__bootFail()},30000);
+</script>
+<script type="module" src="%APP%" onerror="__bootFail()"></script>
 </body>
 </html>

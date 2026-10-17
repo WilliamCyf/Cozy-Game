@@ -85,7 +85,7 @@ function codeOnly(src) {
 }
 
 const used = new Map(); // key -> first place
-const KEY_CALL = /(?<![\w$.])(t|T|tr)\(\s*('(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`)/g;
+const KEY_CALL = /(?<![\w$.])(t|T|tr|N_)\(\s*('(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`)/g;
 for (const file of walk(SRC)) {
   const rel = relative(ROOT, file);
   const src = readFileSync(file, 'utf8');

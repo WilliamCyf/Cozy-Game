@@ -1,6 +1,10 @@
 // Thai translations: English sentence -> Thai sentence. Keep emojis, {placeholders} and line breaks.
 // Part: the pop-up panels (src/ui/panels.js).
 export default {
+  'Tap 🇹🇭 ภาษาไทย / 🇬🇧 English at the top of the menu ☰. Every phone can use its own language.': 'แตะปุ่ม 🇹🇭 ภาษาไทย / 🇬🇧 English ด้านบนของเมนู ☰ มือถือแต่ละเครื่องเลือกภาษาของตัวเองได้นะ',
+  'Read to me': 'อ่านให้ฟัง',
+  'Letters and messages in bottles have a 🔊 button: the phone reads them out loud.': 'จดหมายและข้อความในขวดมีปุ่ม 🔊 แตะแล้วมือถือจะอ่านออกเสียงให้ฟัง',
+  '🔊 Read to me': '🔊 อ่านให้ฟัง',
   // ---- general
   'Hmm, that didn’t work.': 'อืม… ไม่สำเร็จแฮะ',
 

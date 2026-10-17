@@ -290,8 +290,9 @@ export class Game {
     if (me) { me.look = p.look; me.name = p.name; }
     this.ui.renderFamily();
   }
-  // switch language (the app saves and reloads, so every label is rebuilt in the new language)
+  // switch language: everything on screen changes straight away (no reload, nobody is disconnected)
   changeLang(id) { window.__changeLang?.(id); }
+  relabel() { this.ui.relabel(); }
   setSetting(k, v) {
     this.settings[k] = v;
     this.saveSettingsFn(this.settings);
@@ -374,7 +375,13 @@ export class Game {
     if (this.fishing.active) this.fishing.stop();
     const kick = this.session.kicked;
     if (kick && ['closed', 'full', 'version', 'self', 'sent'].includes(kick.why)) {
-      this.ui.showOverlay(`<div class="big-emoji">🌙</div><p>${escapeHTML(tr(kick.msg))}</p>`, [[t('Back to menu'), () => this.backToMenu(), 'primary']]);
+      const buttons = [[t('Back to menu'), () => this.backToMenu(), kick.why === 'version' ? 'ghost' : 'primary']];
+      if (kick.why === 'version') {
+        // phones on different versions can't play together: look for the new version right away
+        window.__checkForUpdate?.(true);
+        buttons.push([t('🔄 Update now'), () => { this.leaving = true; window.__applyUpdate ? window.__applyUpdate() : location.reload(); }, 'primary']);
+      }
+      this.ui.showOverlay(`<div class="big-emoji">🌙</div><p>${escapeHTML(tr(kick.msg))}</p>`, buttons);
       return;
     }
     this.ui.showOverlay(`<div class="big-emoji">📡</div><p><b>${t('Lost the connection to the island…')}</b></p><p class="small">${t('Reconnecting. (Is the host’s phone awake?)')}</p><div class="spinner"></div>`, [[t('Back to menu'), () => this.backToMenu(), 'ghost']]);
@@ -417,17 +424,14 @@ export class Game {
     try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(SAVE_KEY + '.bak'); } catch { /* ignore */ }
     setTimeout(() => location.reload(), 500);
   }
+  // Settings → "Check for update". A new version downloads in the background; as soon as it is
+  // ready, the "New version ready" button appears (see main.js).
   async checkUpdate() {
     this.ui.toast(t('Checking for updates…'), '🔄', 1500);
-    try {
-      const reg = await navigator.serviceWorker?.getRegistration();
-      await reg?.update();
-      if (reg?.waiting || reg?.installing) {
-        this.ui.toast(t('Updating Cozy Cove…'), '✨', 1500);
-        if (this.session.isHost) this.session.save();
-        setTimeout(() => location.reload(), 1500);
-      } else this.ui.toast(t('You have the newest version!'), '✅', 1800);
-    } catch { this.ui.toast(t('Couldn’t check right now.'), '🙈', 1500); }
+    const reg = await window.__checkForUpdate?.(true);
+    if (!reg) this.ui.toast(t('Couldn’t check right now.'), '🙈', 1800);
+    else if (reg.installing || reg.waiting) this.ui.toast(t('A new version is on its way…'), '✨', 2500);
+    else this.ui.toast(t('You have the newest version!'), '✅', 1800);
   }
 
   // ------------------------------------------------------------------ every frame

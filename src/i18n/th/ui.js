@@ -1,6 +1,10 @@
 // Thai translations: English sentence -> Thai sentence. Keep emojis, {placeholders} and line breaks.
 // Part: the HUD and the screens before the game (src/ui/ui.js, screens.js, lookeditor.js, src/main.js).
 export default {
+  // new versions
+  'New version ready · tap to update': 'มีเวอร์ชันใหม่แล้ว · แตะเพื่ออัปเดต',
+  '✨ Updated to the newest version!': '✨ อัปเดตเป็นเวอร์ชันใหม่ล่าสุดแล้ว!',
+  'Version: {when}': 'เวอร์ชัน: {when}',
   // join screen: pick the picture, type the numbers
   'Tap the same picture': 'แตะรูปเดียวกับในมือถือเจ้าของเกาะ',
   'Type the 3 numbers': 'พิมพ์ตัวเลข 3 ตัว',

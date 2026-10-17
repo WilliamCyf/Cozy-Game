@@ -402,6 +402,19 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 .logo-sub { display: inline-block; margin-top: 6px; background: var(--paper); border: 3px solid var(--line); border-radius: 16px; padding: 3px 14px; font-weight: 600; font-size: 15px; }
 .title-buttons { width: min(88vw, 360px); display: flex; flex-direction: column; gap: 12px; margin-top: auto; margin-bottom: 14px; }
 .lang-btn { position: absolute; top: calc(var(--safe-t) + 12px); right: calc(var(--safe-r) + 14px); z-index: 2; padding: 8px 14px; border-radius: 999px; background: rgba(255, 253, 246, 0.92); border: 3px solid var(--line); font-weight: 600; font-size: 16px; box-shadow: 0 3px 0 rgba(90, 61, 43, 0.15); }
+.lang-screen { justify-content: center; background: rgba(32, 178, 198, 0.25); }
+.lang-card h2 { line-height: 1.25; }
+.lang-card h2 small { font-size: 17px; color: var(--ink2); font-weight: 600; }
+.lang-pick { display: flex; flex-direction: column; gap: 12px; margin: 14px 0 10px; }
+.lang-pick .btn { font-size: 24px; display: flex; align-items: center; justify-content: center; gap: 12px; }
+.lang-pick .flag { font-size: 32px; }
+.menu-lang { display: flex; justify-content: flex-end; margin: -4px 0 8px; }
+.lang-pill { padding: 6px 14px; border-radius: 999px; background: var(--paper); border: 3px solid var(--line); font-weight: 600; font-size: 15px; }
+.title-foot .ver { display: block; font-size: 11px; font-weight: 500; opacity: 0.8; margin-top: 2px; }
+.update-pill { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; background: var(--teal); color: #fff; font-weight: 700; font-size: 15px; border: 3px solid var(--teal2); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.15); opacity: 0; transform: translateY(-8px); transition: opacity 0.3s ease, transform 0.3s ease; pointer-events: auto; }
+.update-pill.in { opacity: 1; transform: none; }
+.update-pill.busy { opacity: 0.6; }
+.boot-retry { margin-top: 12px; padding: 10px 18px; border-radius: 16px; border: 3px solid #e2c9a0; background: #fffdf6; color: #5a3d2b; font: inherit; font-weight: 600; }
 .title-foot { font-size: 13px; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); font-weight: 600; }
 .install { width: min(88vw, 360px); background: var(--paper); border: 3px solid var(--orange); border-radius: 16px; padding: 8px 12px; font-size: 14px; text-align: center; margin-bottom: 10px; }
 .share-ic { display: inline-block; border: 2px solid var(--ink2); border-radius: 6px; padding: 0 5px; font-weight: 700; }

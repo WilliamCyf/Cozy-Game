@@ -3,7 +3,7 @@ import { h, tapButton } from './dom.js';
 import { buildLookEditor } from './lookeditor.js';
 import { CODE_WORDS, splitCode } from '../net/transport.js';
 import { JOURNAL_FISH } from '../game/data.js';
-import { LANGS, getLang, isThai, t } from '../i18n/i18n.js';
+import { LANGS, getLang, isThai, t, versionText } from '../i18n/i18n.js';
 
 // "TURTLE482" -> "🐢 TURTLE 482"
 export function prettyCode(code) {
@@ -18,8 +18,10 @@ export class Screens {
     this.el = null;
   }
 
-  mount(el) {
+  // kind: which screen is showing ('title', 'profile', 'join'…), so an update never interrupts typing
+  mount(el, kind = '') {
     this.hide();
+    this.kind = kind;
     this.el = el;
     this.root.appendChild(el);
     requestAnimationFrame(() => el.classList.add('in'));
@@ -28,6 +30,7 @@ export class Screens {
     if (!this.el) return;
     const el = this.el;
     this.el = null;
+    this.kind = '';
     el.classList.remove('in');
     setTimeout(() => el.remove(), 300);
   }
@@ -54,8 +57,23 @@ export class Screens {
         tapButton({ class: 'btn big', ontap: () => { c.audio.unlock(); this.ensureProfile(() => this.join()); } }, h('span', {}, t('🤝 Join family')), h('small', {}, t('Visit someone else’s island'))),
         prof.name ? tapButton({ class: 'btn ghost', ontap: () => this.profile(false, () => this.title(summary)) }, t('👕 {name}’s look', { name: prof.name })) : null),
       !standalone && isIOS ? h('div', { class: 'install' }, h('b', {}, t('Make it an app! ')), t('Tap '), h('span', { class: 'share-ic' }, '⬆︎'), t(' Share, then '), h('b', {}, t('“Add to Home Screen”')), isThai() ? null : '.') : null, // Thai sentences have no full stop
-      h('div', { class: 'title-foot' }, t('Up to 4 players · best on the same Wi-Fi')));
-    this.mount(el);
+      h('div', { class: 'title-foot' }, t('Up to 4 players · best on the same Wi-Fi'), h('small', { class: 'ver' }, t('Version: {when}', { when: versionText() }))));
+    this.mount(el, 'title');
+  }
+
+  // The very first screen on a brand-new phone: choose a language. Everything is written in BOTH
+  // languages here, so whoever holds the phone can read it. The phone's own language is suggested.
+  langChooser(done) {
+    const suggested = getLang();
+    const order = [...LANGS].sort((a, b) => (a.id === suggested ? -1 : b.id === suggested ? 1 : 0));
+    const el = h('div', { class: 'screen lang-screen' },
+      h('div', { class: 'screen-card center lang-card' },
+        h('div', { class: 'big-emoji bob' }, '🏝️'),
+        h('h2', { 'data-noi18n': '' }, 'เลือกภาษา', h('br'), h('small', {}, 'Choose your language')),
+        h('div', { class: 'lang-pick' }, order.map((L) => tapButton({ class: 'btn big' + (L.id === suggested ? ' primary' : ''), ontap: () => { this.ctx.audio.unlock(); done(L.id); } },
+          h('span', { class: 'flag' }, L.flag), h('span', {}, L.label)))),
+        h('p', { class: 'lead', 'data-noi18n': '' }, 'เปลี่ยนได้ทุกเมื่อในเมนู ☰', h('br'), 'You can change it any time in the menu ☰')));
+    this.mount(el, 'lang');
   }
 
   ensureProfile(then) {
@@ -80,7 +98,7 @@ export class Screens {
           saveLabel: first ? t('Let’s go! 🏝️') : t('Save'),
           toast: (msg) => this.flash(msg),
         })));
-    this.mount(el);
+    this.mount(el, 'profile');
   }
 
   // Join: tap the picture shown on the host's phone, then type its 3 numbers (no English needed).
@@ -131,7 +149,7 @@ export class Screens {
         h('div', { class: 'num-row' }, chosen, num),
         error ? h('p', { class: 'error' }, error) : null,
         h('div', { class: 'row' }, tapButton({ class: 'btn ghost', ontap: () => { clearTimeout(going); c.back(); } }, t('← Back')), tapButton({ class: 'btn primary', ontap: go }, t('Join!')))));
-    this.mount(el);
+    this.mount(el, 'join');
   }
 
   connecting(code) {
@@ -142,12 +160,12 @@ export class Screens {
         h('p', { class: 'lead' }, t('Looking for island {code}', { code: prettyCode(code) })),
         h('div', { class: 'spinner' }),
         tapButton({ class: 'btn ghost', ontap: () => this.ctx.back() }, t('Cancel'))));
-    this.mount(el);
+    this.mount(el, 'connecting');
   }
 
   message(html, buttons) {
     const el = h('div', { class: 'screen join' }, h('div', { class: 'screen-card center' }, h('div', { html }), h('div', { class: 'row' }, buttons.map(([l, fn, cls]) => tapButton({ class: 'btn ' + (cls || ''), ontap: fn }, l)))));
-    this.mount(el);
+    this.mount(el, 'message');
   }
 
   flash(text) {

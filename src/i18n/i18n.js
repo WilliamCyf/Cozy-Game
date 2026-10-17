@@ -54,6 +54,10 @@ export function t(s, p) {
 // A message to be translated later, on each phone.
 export const T = (k, p) => (p ? { k, p } : { k });
 
+// Marks a text to be translated later, where it is shown (it stays English until then), so it
+// always appears in the language chosen at that moment. (The checker still finds it.)
+export const N_ = (s) => s;
+
 // Turn anything into text: a T() message, a plain (English) string, or a number.
 export function tr(m) {
   if (m === null || m === undefined) return '';
@@ -68,6 +72,17 @@ export function formatClock(time) {
   if (lang === 'th') return `${String(h).padStart(2, '0')}:${mm} น.`;
   const h12 = h % 12 === 0 ? 12 : h % 12;
   return `${h12}:${mm} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+// Which version of the game this is: the moment it was built (shown in Settings and on the title).
+/* global __BUILT_AT__ */
+export const BUILD_ID = typeof __BUILT_AT__ !== 'undefined' ? __BUILT_AT__ : 'dev';
+export function versionText() {
+  const at = new Date(BUILD_ID);
+  if (Number.isNaN(at.getTime())) return BUILD_ID;
+  try {
+    return new Intl.DateTimeFormat(lang === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(at);
+  } catch { return BUILD_ID.slice(0, 16).replace('T', ' '); }
 }
 
 // The island's name. A family that never renamed it keeps the default name, shown in each phone's language.
@@ -90,4 +105,4 @@ export const hasThai = (s) => /[\u0E00-\u0E7F]/.test(s || '');
   setLang(id);
 })();
 
-if (typeof window !== 'undefined') window.__i18n = { missing, getLang, t, tr };
+if (typeof window !== 'undefined') window.__i18n = { missing, getLang, t, tr, build: BUILD_ID };
