@@ -77,9 +77,9 @@ try {
   const thIdx = await host.$$eval('.seg-b.lang', (els) => els.findIndex((e) => /ภาษาไทย/.test(e.textContent)));
   await (await host.$$('.seg-b.lang'))[thIdx].tap();
   await wait(5000);
-  const after = await host.evaluate(() => ({ th: window.__i18n.getLang() === 'th', same: window.__notReloaded === true, online: window.__game.session.online.size }));
+  const hostNow = await host.evaluate(() => ({ th: window.__i18n.getLang() === 'th', same: window.__notReloaded === true, online: window.__game.session.online.size }));
   const mumOk = await mum.evaluate(() => ({ connected: window.__game.session.connected, lost: !document.querySelector('.overlay')?.classList.contains('hidden') }));
-  check(after.th && after.same && after.online === 2 && mumOk.connected && !mumOk.lost, `host switched to Thai mid-game: no reload, Mum stays connected (${JSON.stringify({ ...after, ...mumOk })})`);
+  check(hostNow.th && hostNow.same && hostNow.online === 2 && mumOk.connected && !mumOk.lost, `host switched to Thai mid-game: no reload, Mum stays connected (${JSON.stringify({ ...hostNow, ...mumOk })})`);
   check(await mum.evaluate(() => window.__i18n.getLang()) === 'th' && await host.evaluate(() => window.__i18n.getLang()) === 'th', 'each phone keeps its own language choice');
   await host.evaluate(() => window.__game.ui.closeSheet());
   await host.evaluate(() => { const g = window.__game, m = [...g.players.remotes.values()][0]; if (m) { g.players.local.x = m.x + 1.2; g.players.local.z = m.z + 1.5; g.rig.snap(); g.rig.setZoom(1.5); } });
