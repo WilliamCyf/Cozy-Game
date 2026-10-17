@@ -38,7 +38,7 @@ function run({ hz, preset = 'cool', work, idleFps = 0, idle = null, late = null,
 
 // 1. a phone that is fine: no brake, steady 30 fps
 let r = run({ hz: 60, work: 6 });
-check(r.scale === 1 && Math.abs(r.fps - 30) < 1, `60 Hz, light frames: full sharpness, ${r.fps} fps`);
+check(r.scale === 1 && r.resizes === 0 && Math.abs(r.fps - 30) < 1, `60 Hz, light frames: full sharpness, no flicker, ${r.fps} fps`);
 r = run({ hz: 120, work: 6 });
 check(r.scale === 1 && Math.abs(r.fps - 30) < 1, `120 Hz screen, light frames: full sharpness, ${r.fps} fps`);
 
@@ -88,6 +88,23 @@ check(r.scale < 1, `(and the hot minute in those cases really did brake: ${r.sca
 // 3b. Low Power Mode: one odd quick frame now and then (a busy moment) is not a reason to brake
 r = run({ hz: 30, preset: 'smooth', work: 6, late: (sec) => (Math.abs(sec % 2.5) < 0.03 ? 10 : 0), seconds: 180 });
 check(r.scale === 1, `Low Power Mode, "Extra smooth", an odd quick frame every 2.5 s: full sharpness (${r.scale.toFixed(2)})`);
+
+// 3c. the phone stamps a frame a little late right after a fresh start (start-up, back from the
+//     background, a hiccup longer than a few frames): on-time pictures after it must not look late,
+//     and sharpness must never flicker
+const firstLate = (d, at = 0) => { let done = false; return (sec) => (!done && sec >= at ? ((done = true), d) : 0); };
+for (const d of [5, 8, 12, 16]) {
+  r = run({ hz: 30, work: 6, late: firstLate(d), seconds: 300 });
+  check(r.scale === 1 && r.resizes === 0, `Low Power Mode, first frame ${d} ms late: full sharpness, no flicker (${r.scale.toFixed(2)}, ${r.resizes} changes)`);
+  r = run({ hz: 60, preset: 'smooth', work: 6, late: firstLate(d), seconds: 300 });
+  check(r.scale === 1 && r.resizes === 0, `"Extra smooth", first frame ${d} ms late: full sharpness, no flicker (${r.scale.toFixed(2)}, ${r.resizes} changes)`);
+}
+// a hiccup in the middle of play (one 150 ms frame), then the next frame stamped late
+r = run({ hz: 30, work: (s, sec) => (sec >= 30 && sec < 30.02 ? 150 : 6), late: firstLate(9, 30.1), seconds: 300 });
+check(r.scale === 1 && r.resizes === 0, `Low Power Mode, a hiccup then a late frame: full sharpness, no flicker (${r.scale.toFixed(2)}, ${r.resizes} changes)`);
+// steady 18-28 ms frames (busy but on time) with a single 45 ms frame
+r = run({ hz: 60, work: (s, sec) => (sec >= 20 && sec < 20.02 ? 45 : 18 + 10 * ((Math.sin(sec * 7) + 1) / 2)), seconds: 300 });
+check(r.scale === 1 && r.resizes === 0, `busy but on-time frames with one slow one: full sharpness, no flicker (${r.scale.toFixed(2)}, ${r.resizes} changes)`);
 
 // 6. "Extra smooth" on a phone that keeps up: 60 fps, full sharpness
 r = run({ hz: 60, preset: 'smooth', work: 8 });

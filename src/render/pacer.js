@@ -36,13 +36,14 @@ export function makePacer(state, applySize) {
     // Move the "last drawn" clock forward in whole steps so the rhythm stays even.
     if (since > interval * 3) state.lastRender = now;
     else state.lastRender += interval * Math.max(1, Math.floor((since + 4) / interval));
-    // Adaptive resolution: if frames keep arriving late, draw fewer pixels.
-    if (since > expected * 1.45 && since < 400) state.slowFrames++;
-    else state.slowFrames = Math.max(0, state.slowFrames - 0.25);
-    // Cooled down? Judged by the real time between pictures (the schedule above can sit a little
-    // out of step after a page was open).
+    // Adaptive resolution: if frames keep arriving late, draw fewer pixels. "Late" must be true by
+    // the schedule AND by the real time since the last picture (the schedule can sit a little out of
+    // step after a start, a page or a hiccup, and then on-time pictures would look late).
     const drawGap = now - state.lastDraw;
     state.lastDraw = now;
+    if (since > expected * 1.45 && since < 400 && drawGap > expected * 1.15) state.slowFrames++;
+    else state.slowFrames = Math.max(0, state.slowFrames - 0.25);
+    // Cooled down? Judged by the real time between pictures.
     if (drawGap < expected * 1.15) state.fastFrames++;
     else state.fastFrames = Math.max(0, state.fastFrames - fps); // (one late picture costs a second of progress, not all of it)
     if (state.slowFrames > fps * 2.5) {
