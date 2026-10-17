@@ -38,13 +38,17 @@ function fill(s, p) {
   return s.replace(/\{(\w+)\}/g, (m, k) => (k in p ? (p[k] && typeof p[k] === 'object' ? tr(p[k]) : String(p[k])) : m));
 }
 
+// One English word can need two different Thai words (the fish you caught vs. the "go fishing"
+// button), so a key may start with a context: t('action|Fish'). English shows the part after '|'.
 export function t(s, p) {
-  if (table && typeof s === 'string') {
+  if (typeof s !== 'string') return fill(String(s ?? ''), p);
+  if (table) {
     const v = table[s];
-    if (v !== undefined) s = v;
-    else if (s && missing.size < 2000) missing.add(s);
+    if (v !== undefined) return fill(v, p);
+    if (s && missing.size < 2000) missing.add(s);
   }
-  return fill(s, p);
+  const bar = s.indexOf('|');
+  return fill(bar > 0 ? s.slice(bar + 1) : s, p);
 }
 
 // A message to be translated later, on each phone.

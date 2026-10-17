@@ -75,7 +75,7 @@ export class Interact {
     }
     if (best) return best;
     // nothing nearby — is there water to fish in?
-    if (this.ctx.fishing.findWater(P) !== null) return { type: 'fish', icon: '🎣', label: t('Fish') };
+    if (this.ctx.fishing.findWater(P) !== null) return { type: 'fish', icon: '🎣', label: t('action|Fish') };
     return null;
   }
 

@@ -15,7 +15,7 @@ function say(x) {
   if (typeof x !== 'string' || !LATIN.test(x) || hasThai(x)) return x;
   return t(x);
 }
-const initial = (name) => firstLetter(name).toUpperCase(); // for the family dots (keeps a Thai vowel with its consonant)
+const initial = (name) => firstLetter(name).toUpperCase(); // for the family dots
 
 export class UI {
   constructor(root, game) {

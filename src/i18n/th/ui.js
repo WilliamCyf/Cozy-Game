@@ -1,6 +1,12 @@
 // Thai translations: English sentence -> Thai sentence. Keep emojis, {placeholders} and line breaks.
 // Part: the HUD and the screens before the game (src/ui/ui.js, screens.js, lookeditor.js, src/main.js).
 export default {
+  // join screen: pick the picture, type the numbers
+  'Tap the same picture': 'แตะรูปเดียวกับในมือถือเจ้าของเกาะ',
+  'Type the 3 numbers': 'พิมพ์ตัวเลข 3 ตัว',
+  'The 3 numbers': 'ตัวเลข 3 ตัว',
+  'First tap the picture you see on the host’s phone': 'แตะรูปที่เห็นในมือถือเจ้าของเกาะก่อนนะ',
+  'Type the 3 numbers next to the picture': 'พิมพ์ตัวเลข 3 ตัวที่อยู่ข้างรูปนะ',
   // ---------------------------------------------------------------- HUD (src/ui/ui.js)
   'Day {n}': 'วันที่ {n}',
   'Menu': 'เมนู',
@@ -12,7 +18,7 @@ export default {
   'Explore': 'เดินเล่น',
 
   // the big button while fishing
-  'Let go!': 'ปล่อยเลย!',
+  'Let go!': 'ปล่อยนิ้ว!',
   'Reel in': 'ม้วนสาย',
   'Hook it!': 'ตวัดเบ็ด!',
   'Wait…': 'รอก่อน…',
@@ -54,16 +60,15 @@ export default {
   // making your islander
   'Make your islander!': 'มาสร้างตัวละครกันเถอะ!',
   'Your look': 'หน้าตาของฉัน',
-  'Everyone in the family makes their own on their phone.': 'ทุกคนในครอบครัวสร้างตัวละครของตัวเองบนมือถือของแต่ละคนนะ',
+  'Everyone in the family makes their own on their phone.': 'แต่ละคนในครอบครัวสร้างตัวละครในมือถือของตัวเองนะ',
   'Let’s go! 🏝️': 'ไปกันเลย! 🏝️',
   'Save': 'บันทึก',
 
   // joining a family island
   '🤝 Join your family': '🤝 ไปเที่ยวเกาะครอบครัว',
   'On the host’s phone, open the menu ☰ → ': 'ที่มือถือของเจ้าของเกาะ เปิดเมนู ☰ → ',
-  'Family & Invite': 'ครอบครัว & ชวนมาเล่น',
+  'Family & Invite': 'ชวนครอบครัวมาเล่น',
   ' to see the island code.': ' แล้วจะเห็นรหัสเกาะ',
-  'Type the island code from the host’s phone': 'พิมพ์รหัสเกาะจากมือถือของเจ้าของเกาะนะ',
   '← Back': '← กลับ',
   'Join!': 'ไปเลย!',
   'Sailing to the island…': 'กำลังล่องเรือไปที่เกาะ…',
@@ -81,7 +86,7 @@ export default {
   'Name': 'ชื่อ',
   'Type your name': 'พิมพ์ชื่อตรงนี้',
   'Skin': 'สีผิว',
-  'Shirt': 'เสื้อ',
+  'Shirt': 'สีเสื้อ',
   'Favourite colour': 'สีโปรด',
   'Hair': 'สีผม',
   'Hat': 'หมวก',

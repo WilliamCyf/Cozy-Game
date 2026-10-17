@@ -107,7 +107,7 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
   min-height: 40px;
 }
 .chip .ic { font-size: 20px; }
-.chip .col { display: flex; flex-direction: column; line-height: 1.05; }
+.chip .col { display: flex; flex-direction: column; line-height: 1.05; white-space: nowrap; }
 .chip small { font-size: 11px; color: var(--ink2); font-weight: 500; }
 .coins.bump { animation: bump 0.35s ease; }
 @keyframes bump { 40% { transform: scale(1.15); } }
@@ -127,9 +127,19 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
   flex: none;
 }
 .face.me { width: 34px; height: 34px; }
+/* family faces overlap a little, like a stack of photos, so 4 players fit on small iPhones */
+.face + .face { margin-left: -8px; box-shadow: -2px 0 0 1px rgba(255, 248, 232, 0.95); }
 .face.add { background: transparent !important; border: 2px dashed var(--line2); color: var(--ink2); text-shadow: none; }
 .net-dot { position: absolute; right: -3px; top: -3px; width: 11px; height: 11px; border-radius: 50%; background: #f5cf4a; border: 2px solid var(--cream); }
 .net-dot.ok { background: var(--green); }
+/* most iPhones are 375-393 px wide: slim the top bar so clock, 4 faces, coins and menu all fit */
+@media (max-width: 400px) {
+  .top, .top-right { gap: 5px; }
+  .chip { padding: 4px 9px 4px 6px; gap: 4px; }
+  .chip .ic { font-size: 18px; }
+  .face + .face { margin-left: -10px; }
+  .top .round { width: 40px; height: 40px; }
+}
 
 .bottom-right {
   position: absolute; right: calc(var(--safe-r) + 12px); bottom: calc(var(--safe-b) + 14px);
@@ -184,7 +194,8 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 .toast.in { opacity: 1; transform: none; }
 .toast.out { opacity: 0; transform: translateY(-8px); }
 .toast.solo { position: absolute; left: 50%; top: calc(var(--safe-t) + 20px); transform: translateX(-50%); z-index: 50; }
-.hint { position: absolute; left: 50%; top: calc(var(--safe-t) + 60px); transform: translateX(-50%); background: rgba(90, 61, 43, 0.82); color: #fff; padding: 8px 16px; border-radius: 18px; font-weight: 600; font-size: 15px; white-space: nowrap; animation: bob 2.4s ease-in-out infinite; pointer-events: none; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
+/* centred with margin auto (a transform would be replaced by the bob animation); long tips wrap */
+.hint { position: absolute; left: 0; right: 0; margin: 0 auto; width: max-content; max-width: min(92vw, 380px); top: calc(var(--safe-t) + 60px); background: rgba(90, 61, 43, 0.82); color: #fff; padding: 8px 16px; border-radius: 18px; font-weight: 600; font-size: 15px; line-height: 1.3; text-align: center; animation: bob 2.4s ease-in-out infinite; pointer-events: none; }
 .stick-base { position: absolute; left: 0; top: 0; width: 108px; height: 108px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.7); background: rgba(255, 255, 255, 0.18); opacity: 0; transition: opacity 0.15s; pointer-events: none !important; }
 .stick-base.on { opacity: 1; }
 .stick-knob { position: absolute; left: 30px; top: 30px; width: 48px; height: 48px; border-radius: 50%; background: rgba(255, 248, 232, 0.95); border: 3px solid var(--line2); }
@@ -264,7 +275,7 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 .ing b { font-size: 12px; }
 .ing.ok { background: #e4f6da; }
 .tabs { display: flex; gap: 8px; margin-bottom: 10px; }
-.tab { flex: 1; padding: 8px; border-radius: 16px; background: var(--cream2); border: 3px solid var(--line); font-weight: 600; font-size: 15px; }
+.tab { flex: 1; min-width: 0; padding: 8px 4px; border-radius: 16px; background: var(--cream2); border: 3px solid var(--line); font-weight: 600; font-size: 15px; white-space: nowrap; }
 .tab.on { background: var(--teal); border-color: var(--teal2); color: #fff; }
 .progress { position: relative; height: 26px; border-radius: 14px; background: var(--paper); border: 3px solid var(--line); overflow: hidden; margin-bottom: 10px; }
 .progress i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #8ae0c8, var(--teal)); }
@@ -340,6 +351,16 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
   width: 100%; font-size: 20px; font-weight: 600; padding: 10px 14px; border-radius: 16px;
   border: 3px solid var(--line2); background: #fff; color: var(--ink); outline: none;
 }
+.step { display: flex; align-items: center; gap: 8px; margin: 8px 0 4px; font-weight: 600; font-size: 15px; color: var(--ink2); }
+.step b { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--teal); color: #fff; font-size: 14px; flex: none; }
+.pic-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.pic { aspect-ratio: 1; font-size: 27px; line-height: 1; border-radius: 14px; background: var(--paper); border: 3px solid var(--line); transition: transform 0.12s ease; }
+.pic.on { background: #fff4dc; border-color: var(--orange); transform: scale(1.1); }
+.num-row { display: flex; align-items: center; gap: 10px; }
+.num-pic { font-size: 40px; line-height: 1; width: 52px; text-align: center; flex: none; }
+.num-input { flex: 1; min-width: 0; text-align: center; font-size: 34px; letter-spacing: 12px; padding: 8px 0 8px 12px; border-radius: 16px; border: 3px solid var(--line2); background: #fff; color: var(--ink); font-weight: 700; outline: none; }
+.code-pic { font-size: 46px; margin-right: 8px; vertical-align: -6px; }
+.code b { font-weight: 700; }
 .code-input { text-align: center; font-size: 34px; letter-spacing: 4px; text-transform: uppercase; }
 
 /* ------------------------------------------------ catch card & overlays */

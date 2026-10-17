@@ -1,9 +1,15 @@
 // Screens before the game starts: title, "make your islander", and "join family".
 import { h, tapButton } from './dom.js';
 import { buildLookEditor } from './lookeditor.js';
-import { cleanCode } from '../net/transport.js';
+import { CODE_WORDS, splitCode } from '../net/transport.js';
 import { JOURNAL_FISH } from '../game/data.js';
 import { LANGS, getLang, isThai, t } from '../i18n/i18n.js';
+
+// "TURTLE482" -> "🐢 TURTLE 482"
+export function prettyCode(code) {
+  const sc = splitCode(code);
+  return sc ? `${sc.pic ? sc.pic + ' ' : ''}${sc.word} ${sc.num}` : String(code || '');
+}
 
 export class Screens {
   constructor(root, ctx) {
@@ -77,27 +83,55 @@ export class Screens {
     this.mount(el);
   }
 
+  // Join: tap the picture shown on the host's phone, then type its 3 numbers (no English needed).
   join(prefill = '', error = '') {
     const c = this.ctx;
-    const input = h('input', { class: 'code-input', maxlength: 9, value: prefill, placeholder: 'CRAB27', autocomplete: 'off', autocorrect: 'off', autocapitalize: 'characters', spellcheck: 'false', enterkeyhint: 'go', inputmode: 'text' });
+    const pre = splitCode(prefill);
+    let word = pre?.pic ? pre.word : null;
+    const num = h('input', { class: 'num-input', type: 'text', inputmode: 'numeric', pattern: '[0-9]*', maxlength: 3, value: pre?.pic ? pre.num : '', placeholder: '123', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'go', 'aria-label': t('The 3 numbers') });
+    const chosen = h('span', { class: 'num-pic' }, pre?.pic || '❔');
+    let going = null;
     const go = () => {
-      const code = cleanCode(input.value);
-      if (code.length < 3) { this.flash(t('Type the island code from the host’s phone')); return; }
-      input.blur();
+      clearTimeout(going);
+      const digits = num.value.replace(/\D/g, '');
+      if (!word) { num.blur(); this.flash(t('First tap the picture you see on the host’s phone')); return; }
+      if (digits.length !== 3) { this.flash(t('Type the 3 numbers next to the picture')); num.focus(); return; }
+      num.blur();
+      const code = word + digits;
       this.connecting(code);
       c.onJoin(code);
     };
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
-    input.addEventListener('input', () => { const v = cleanCode(input.value); if (v !== input.value) input.value = v; });
+    const grid = h('div', { class: 'pic-grid' });
+    for (const [w, pic] of CODE_WORDS) {
+      const b = tapButton({ class: 'pic' + (w === word ? ' on' : ''), 'aria-label': w, ontap: () => {
+        word = w;
+        for (const x of grid.children) x.classList.toggle('on', x === b);
+        chosen.textContent = pic;
+        c.audio.ui?.('tap');
+        if (num.value.replace(/\D/g, '').length === 3) go();
+        else try { num.focus(); } catch { /* fine */ }
+      } }, pic);
+      grid.appendChild(b);
+    }
+    // the number keypad has no "Go" key on iPhone: join by itself once all 3 numbers are typed
+    num.addEventListener('input', () => {
+      const v = num.value.replace(/\D/g, '').slice(0, 3);
+      if (v !== num.value) num.value = v;
+      clearTimeout(going);
+      if (v.length === 3) going = setTimeout(go, 450);
+    });
+    num.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
     const el = h('div', { class: 'screen join' },
       h('div', { class: 'screen-card' },
         h('h2', {}, t('🤝 Join your family')),
         h('p', { class: 'lead' }, t('On the host’s phone, open the menu ☰ → '), h('b', {}, t('Family & Invite')), t(' to see the island code.')),
-        input,
+        h('div', { class: 'step' }, h('b', {}, '1'), t('Tap the same picture')),
+        grid,
+        h('div', { class: 'step' }, h('b', {}, '2'), t('Type the 3 numbers')),
+        h('div', { class: 'num-row' }, chosen, num),
         error ? h('p', { class: 'error' }, error) : null,
-        h('div', { class: 'row' }, tapButton({ class: 'btn ghost', ontap: () => c.back() }, t('← Back')), tapButton({ class: 'btn primary', ontap: go }, t('Join!')))));
+        h('div', { class: 'row' }, tapButton({ class: 'btn ghost', ontap: () => { clearTimeout(going); c.back(); } }, t('← Back')), tapButton({ class: 'btn primary', ontap: go }, t('Join!')))));
     this.mount(el);
-    setTimeout(() => { try { input.focus(); } catch { /* fine */ } }, 350);
   }
 
   connecting(code) {
@@ -105,7 +139,7 @@ export class Screens {
       h('div', { class: 'screen-card center' },
         h('div', { class: 'big-emoji bob' }, '⛵'),
         h('h2', {}, t('Sailing to the island…')),
-        h('p', { class: 'lead' }, t('Looking for island {code}', { code: code.replace(/(\d+)$/, ' $1') })),
+        h('p', { class: 'lead' }, t('Looking for island {code}', { code: prettyCode(code) })),
         h('div', { class: 'spinner' }),
         tapButton({ class: 'btn ghost', ontap: () => this.ctx.back() }, t('Cancel'))));
     this.mount(el);

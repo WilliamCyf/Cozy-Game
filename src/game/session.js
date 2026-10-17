@@ -3,7 +3,7 @@
 // it doesn't need to care whether this phone is the host or a guest.
 import { applyOps, newWorldState, migrate, saveIsland, loadIsland } from './state.js';
 import { HostLogic } from './host.js';
-import { HostTransport, joinHost, makeIslandCode } from '../net/transport.js';
+import { HostTransport, joinHost, makeIslandCode, isPictureCode } from '../net/transport.js';
 
 // 4: news and replies are message objects (T() in i18n.js) that each phone shows in its own language.
 // An older game would choke on them, so it is told "different versions" instead.
@@ -46,6 +46,7 @@ export class Session extends Emitter {
     const fresh = newWorldState({ code: makeIslandCode(), plots: this.world.plots.length, bushes: this.world.bushes.length, palms: this.world.palms.length });
     const saved = loadIsland();
     this.state = saved ? migrate(saved, { ...fresh, code: saved.code || fresh.code }) : fresh;
+    if (!isPictureCode(this.state.code)) this.state.code = fresh.code; // islands from before picture codes get one
     this.logic = new HostLogic(this, this.world, this.spawns);
     this.links = new Set();
     this.logic.a_hello(this.pid, { name: this.profile.name, look: this.profile.look });

@@ -3,6 +3,8 @@ import { h, tapButton, firstLetter } from './dom.js';
 import { ITEMS, FISH, FISH_BY_ID, JOURNAL_FISH, RARITY, CROPS, RECIPES, SHOP, PROJECTS, PROJECT_BY_ID, STICKERS } from '../game/data.js';
 import { HATS } from '../entities/character.js';
 import { buildLookEditor, hatEmoji } from './lookeditor.js';
+import { prettyCode } from './screens.js';
+import { splitCode } from '../net/transport.js';
 import { fishSVG } from './fishart.js';
 import { QUALITY } from '../render/renderer.js';
 import { t, tr, islandName, LANGS, getLang } from '../i18n/i18n.js';
@@ -355,8 +357,10 @@ export function familyPanel(g) {
     build: (b) => {
       const S = g.session;
       const code = S.code || '';
-      const pretty = code.replace(/(\d+)$/, ' $1');
-      b.append(h('div', { class: 'code-box' }, h('div', { class: 'island-name' }, '🏝️ ', islandName(S.state.name)), h('small', {}, S.isHost ? t('Our island code') : t('Island code')), h('div', { class: 'code' }, pretty)));
+      const pretty = prettyCode(code);
+      const sc = splitCode(code);
+      b.append(h('div', { class: 'code-box' }, h('div', { class: 'island-name' }, '🏝️ ', islandName(S.state.name)), h('small', {}, S.isHost ? t('Our island code') : t('Island code')),
+        h('div', { class: 'code' }, sc?.pic ? h('span', { class: 'code-pic' }, sc.pic) : null, sc ? h('span', {}, sc.word, ' ', h('b', {}, sc.num)) : code)));
       if (S.isHost) {
         b.append(h('div', { class: 'row' }, btn(t('✏️ Name our island'), async () => {
           const shown = islandName(S.state.name);
@@ -367,7 +371,7 @@ export function familyPanel(g) {
       }
       if (S.isHost) {
         const st = S.transport?.status() || {};
-        b.append(h('p', { class: 'lead' }, t('On another phone: open Cozy Cove → '), h('b', {}, t('Join Family')), t(' → type this code. Up to 4 players can play together. Being on the same Wi-Fi works best!')));
+        b.append(h('p', { class: 'lead' }, t('On another phone: open Cozy Cove → '), h('b', {}, t('Join Family')), t(' → tap this picture and type its numbers. Up to 4 players can play together. Being on the same Wi-Fi works best!')));
         b.append(h('p', { class: 'net ' + (st.peer || st.trystero ? 'ok' : '') }, st.peer ? t('🟢 Ready for family to join') : t('🟡 Connecting to the internet… (you can still play)')));
       } else {
         b.append(h('p', { class: 'lead' }, t('You’re visiting the family island. Everything you find goes into the shared family basket!')));
@@ -457,7 +461,7 @@ export function helpPanel(g) {
         tip('🍳', t('Cooking'), t('Visit the campfire to turn fish, fruit and veggies into yummy dishes.')),
         tip('📋', t('Family Board'), t('Work together to fix the bridge, light the lighthouse and throw a Lantern Festival!')),
         tip('🧺', t('Shared basket'), t('Everything anyone finds goes into ONE family basket. Coins go into the family jar.')),
-        tip('👨‍👩‍👧‍👦', t('Play together'), t('One phone taps "Play on our island". Others tap "Join Family" and type the island code. Up to 4 players!')),
+        tip('👨‍👩‍👧‍👦', t('Play together'), t('One phone taps "Play on our island". Others tap "Join Family", tap the island’s picture and type its 3 numbers. Up to 4 players!')),
         tip('✉️', t('Every day'), t('Check the mailbox each morning for a gift, and dig for treasure on Turtle Islet!')),
       );
     },

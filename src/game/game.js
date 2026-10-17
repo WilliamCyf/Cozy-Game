@@ -8,6 +8,7 @@ import { WorldView } from './worldview.js';
 import { Interact } from './interact.js';
 import { DayNight } from './daynight.js';
 import { UI } from '../ui/ui.js';
+import { escapeHTML } from '../ui/dom.js';
 import { PANELS, plantPanel, letterPanel, boardPanel } from '../ui/panels.js';
 import { ITEMS, CROPS, PROJECT_BY_ID, itemName } from './data.js';
 import { U } from '../render/materials.js';
@@ -373,7 +374,7 @@ export class Game {
     if (this.fishing.active) this.fishing.stop();
     const kick = this.session.kicked;
     if (kick && ['closed', 'full', 'version', 'self', 'sent'].includes(kick.why)) {
-      this.ui.showOverlay(`<div class="big-emoji">🌙</div><p>${tr(kick.msg)}</p>`, [[t('Back to menu'), () => this.backToMenu(), 'primary']]);
+      this.ui.showOverlay(`<div class="big-emoji">🌙</div><p>${escapeHTML(tr(kick.msg))}</p>`, [[t('Back to menu'), () => this.backToMenu(), 'primary']]);
       return;
     }
     this.ui.showOverlay(`<div class="big-emoji">📡</div><p><b>${t('Lost the connection to the island…')}</b></p><p class="small">${t('Reconnecting. (Is the host’s phone awake?)')}</p><div class="spinner"></div>`, [[t('Back to menu'), () => this.backToMenu(), 'ghost']]);

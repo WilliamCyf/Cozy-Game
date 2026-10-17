@@ -304,15 +304,29 @@ export function joinHost(code, timeoutMs = 20000) {
   });
 }
 
-// Friendly island codes, e.g. "CRAB 27": a cozy word + 2 digits (easy for kids to type).
-const WORDS = ['CRAB', 'FISH', 'SHELL', 'WAVE', 'SUN', 'PALM', 'BOAT', 'STAR', 'MOON', 'CORAL', 'SAND', 'KELP', 'PEARL', 'TIDE',
-  'REEF', 'DUCK', 'FROG', 'BEAR', 'MINT', 'PLUM', 'PEACH', 'LIME', 'KIWI', 'BERRY', 'HONEY', 'TACO', 'CAKE', 'PIE', 'MANGO', 'OTTER',
-  'SEAL', 'GULL', 'TURTLE', 'SQUID', 'TUNA', 'KOI', 'LILY', 'DAISY', 'FERN', 'MAPLE', 'CLOUD', 'RAIN', 'BREEZE', 'COCO', 'BEACH', 'COVE', 'ISLE', 'NEMO'];
+// Friendly island codes, e.g. "🐢 TURTLE 482": a picture word + 3 numbers.
+// Every word has its own picture, so joining is "tap the turtle, type 482": nobody has to read
+// English letters (Mum reads Thai, little ones may not read yet).
+export const CODE_WORDS = [
+  ['CRAB', '🦀'], ['FISH', '🐟'], ['SHELL', '🐚'], ['WAVE', '🌊'], ['SUN', '☀️'], ['PALM', '🌴'],
+  ['BOAT', '⛵'], ['STAR', '⭐'], ['MOON', '🌙'], ['CLOUD', '☁️'], ['RAIN', '🌧️'], ['DUCK', '🦆'],
+  ['FROG', '🐸'], ['BEAR', '🐻'], ['OTTER', '🦦'], ['SEAL', '🦭'], ['TURTLE', '🐢'], ['SQUID', '🦑'],
+  ['OCTO', '🐙'], ['WHALE', '🐳'], ['NEMO', '🐠'], ['PEACH', '🍑'], ['KIWI', '🥝'], ['BERRY', '🍓'],
+  ['HONEY', '🍯'], ['TACO', '🌮'], ['CAKE', '🍰'], ['MANGO', '🥭'], ['COCO', '🥥'], ['DAISY', '🌼'],
+  ['MAPLE', '🍁'], ['BUNNY', '🐰'], ['KITTY', '🐱'], ['PANDA', '🐼'], ['CHICK', '🐥'], ['BEE', '🐝'],
+];
+const CODE_PIC = Object.fromEntries(CODE_WORDS);
 export function makeIslandCode() {
-  const w = WORDS[Math.floor(Math.random() * WORDS.length)];
+  const w = CODE_WORDS[Math.floor(Math.random() * CODE_WORDS.length)][0];
   const n = String(100 + Math.floor(Math.random() * 900));
   return w + n;
 }
+// "TURTLE482" -> { word: 'TURTLE', num: '482', pic: '🐢' }  (pic is '' for an old-style code)
+export function splitCode(code) {
+  const m = /^([A-Z]+)(\d+)$/.exec(cleanCode(code));
+  return m ? { word: m[1], num: m[2], pic: CODE_PIC[m[1]] || '' } : null;
+}
+export const isPictureCode = (code) => !!splitCode(code)?.pic && splitCode(code).num.length === 3;
 export function cleanCode(s) {
   return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 9);
 }

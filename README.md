@@ -43,12 +43,22 @@ Pick **one** option:
 
 1. One person (the **host**) taps **🏝️ Play on our island**. The island is saved on *this* phone,
    so it's best if the same person hosts each time.
-2. On the host's phone: menu **☰** → **Family & Invite** shows the island code, e.g. **CRAB 273**.
-3. Everyone else taps **🤝 Join family** and types that code.
+2. On the host's phone: menu **☰** → **Family & Invite** shows the island code: a picture and
+   3 numbers, e.g. **🐢 TURTLE 482**.
+3. Everyone else taps **🤝 Join family**, **taps the same picture** (🐢) and types the **3 numbers**.
+   It joins by itself — no English letters to read or type.
 4. Being on the **same Wi‑Fi** works best. (Some mobile networks block direct phone-to-phone
    connections; if a phone on mobile data can't join, switch it to Wi‑Fi.)
 
-## 4. How to play (also in the game under ☰ → How to Play)
+## 4. English and Thai · ภาษาไทย
+
+* A phone set to Thai starts the game **in Thai automatically**.
+* To switch: the **🇹🇭 ภาษาไทย / 🇬🇧 English** button at the top of the title screen, or
+  **☰ → Settings → Language**. Each phone chooses its own language, so Mum can play in Thai
+  while the kids play in English on the same island — news like "Mia caught a Golden Koi!"
+  shows up on every phone in that phone's language.
+
+## 5. How to play (also in the game under ☰ → How to Play)
 
 | | |
 |---|---|
@@ -63,7 +73,7 @@ Pick **one** option:
 | 🧺 **Picnic** | Sit together on the picnic blanket (2+ people) for a small daily bonus. |
 | 🏝️ **Island name** | The host can name your island in ☰ → Family & Invite. |
 
-## 5. Cool phone, happy battery
+## 6. Cool phone, happy battery
 
 The game was built to stay cool:
 * It draws **30 pictures per second** (half the usual work) and never more pixels than needed.
@@ -89,6 +99,10 @@ You can choose in **☰ → Settings → Graphics**: *Cool & cozy* (default), *E
   the same entries in the same order — like a family accounting journal — so all copies always match.
 * **Home-screen app:** a web manifest + service worker make it installable and playable offline.
 * **Sound:** all music and sound effects are synthesized live (Web Audio) — no audio files.
+* **Two languages:** every English sentence is looked up in a Thai "dictionary" (`src/i18n/th/`).
+  The host sends news as a *recipe* (`"{name} caught a {fish}!"` + the names) instead of finished
+  words, and each phone cooks it in its own language. Thai letters use the rounded **Mali** font
+  (~15 KB, only downloaded when Thai is on screen).
 
 ### Developer notes
 
@@ -105,6 +119,9 @@ Tests (Playwright, using local stand-ins for the matchmakers):
 
 ```bash
 node tests/play.mjs flow     # whole-game playthrough
+node tests/thai.mjs          # every screen in Thai: no English left, nothing cut off
+node tests/join-pictures.mjs # Mum joins from a Thai phone with a picture code
+node tools/i18n-check.mjs    # every text has Thai, {placeholders} match
 node tests/mp.mjs both       # 4 players + a 5th who is turned away
 node tests/reconnect.mjs     # dropped connections and a sleeping host
 node tests/touch.mjs         # real touch: joystick, button, pinch
@@ -123,6 +140,7 @@ src/
   game/              rules (host), ledger, session, players, fishing, garden, critters, effects…
   net/               finding each other + talking (PeerJS + Trystero)
   ui/                HUD, panels, screens, fish drawings
+  i18n/              languages: t() / T() / tr(), Thai translations in th/
   audio/             generative music + sound effects
 docs/                the built game (this is what gets hosted)
 ```

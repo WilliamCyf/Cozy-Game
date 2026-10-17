@@ -1,6 +1,7 @@
 // Thai translations: English sentence -> Thai sentence. Keep emojis, {placeholders} and line breaks.
 // Part: the game itself (src/game/game.js, interact.js, fishing.js, players.js, src/world/world.js).
 export default {
+  'action|Fish': 'ตกปลา', // the big button by the water ("Fish" alone is the food/basket word)
   // ---- island name (islandName() in i18n.js)
   'Cozy Cove': 'อ่าวแสนสุข',
   'Day {n}': 'วันที่ {n}',
@@ -27,7 +28,7 @@ export default {
   'Oops, the pot tipped over!': 'อุ๊ย หม้อคว่ำซะแล้ว!',
 
   // ---- first-time hints
-  '👆 Slide your thumb on the island to walk around': '👆 ลากนิ้วบนเกาะเพื่อเดินไปรอบ ๆ นะ',
+  '👆 Slide your thumb on the island to walk around': '👆 ลากนิ้วบนเกาะเพื่อเดินไปรอบๆ นะ',
   '🎣 Walk to the water and press the big button to fish': '🎣 เดินไปริมน้ำ แล้วกดปุ่มใหญ่เพื่อตกปลา',
   '📋 Visit the Family Board next to the cottage': '📋 ไปดูกระดานครอบครัวข้างบ้านกันเถอะ',
   '🌱 Plant seeds in the garden by the cottage': '🌱 ไปปลูกเมล็ดในแปลงผักข้างบ้านกันเถอะ',
@@ -37,7 +38,7 @@ export default {
   'Lost the connection to the island…': 'การเชื่อมต่อกับเกาะหลุดไป…',
   'Reconnecting. (Is the host’s phone awake?)': 'กำลังเชื่อมต่อใหม่ (มือถือของเจ้าของเกาะยังเปิดอยู่ไหมนะ?)',
   'Back on the island!': 'กลับมาที่เกาะแล้ว!',
-  'Couldn’t reach the island. Ask the host to open Cozy Cove, then try again.': 'ติดต่อเกาะไม่ได้ ลองบอกเจ้าของเกาะให้เปิดเกม Cozy Cove แล้วลองใหม่อีกครั้งนะ',
+  'Couldn’t reach the island. Ask the host to open Cozy Cove, then try again.': 'ติดต่อเกาะไม่ได้ ลองบอกเจ้าของเกาะให้เปิดเกมไว้ แล้วลองใหม่อีกครั้งนะ',
 
   // ---- updates
   'Checking for updates…': 'กำลังตรวจหาอัปเดต…',
@@ -51,10 +52,10 @@ export default {
   'Hold to reel!': 'กดค้างเพื่อม้วนสาย!',
   'Too slow! Tap "Hook it!" when the bobber dips.': 'ช้าไปนิด! พอทุ่นจมลง ให้แตะ "ตวัดเบ็ด!" นะ',
   'It swam away… try again!': 'ปลาว่ายหนีไปแล้ว… ลองใหม่นะ!',
-  'Let go!': 'ปล่อยเลย!',
+  'Let go!': 'ปล่อยนิ้ว!',
   'Wait…': 'รอก่อน…',
   'Reeling…': 'กำลังม้วนสาย…',
-  'Snap! The line broke — let go when the fish pulls.': 'ปึ๊ง! สายขาดแล้ว — ตอนปลาดึง ให้ปล่อยนิ้วนะ',
+  'Snap! The line broke — let go when the fish pulls.': 'ผึง! สายขาดแล้ว — ตอนปลาดึง ให้ปล่อยนิ้วนะ',
   'The fish swam away. So close!': 'ปลาว่ายหนีไปแล้ว เกือบได้แล้วเชียว!',
 
   // ---- the big action button (interact.js)
