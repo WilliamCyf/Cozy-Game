@@ -68,11 +68,15 @@ try {
   await a.screenshot({ path: `${out}/1-walked.png` });
 
   // 2. "Start a brand-new island" from Settings (the island is wiped, the game reloads)
+  //    The old island is marked first (day 9, 777 coins): it must NOT come back.
+  await a.evaluate(() => { const s = window.__game.session; s.state.day = 9; s.state.coins = 777; s.save(); });
   await a.evaluate(() => { window.__oldGame = true; window.__game.resetIsland(); });
   await a.waitForFunction(() => !window.__oldGame && window.__game?.session?.state, null, { timeout: 90000 });
   await wait(2500);
   n = await people(a);
   check(n === 1, `after "Start a brand-new island": ${n} character(s)`);
+  const fresh = await a.evaluate(() => { const s = window.__game.session.state; return { day: s.day, coins: s.coins }; });
+  check(fresh.day === 1 && fresh.coins !== 777, `the new island really is new (day ${fresh.day}, ${fresh.coins} coins)`);
 
   // 3. returning player who first changes their look on the title screen, then plays
   await a.evaluate(() => sessionStorage.removeItem('cozycove.resume'));
