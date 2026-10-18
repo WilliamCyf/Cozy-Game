@@ -34,7 +34,8 @@ try {
 
   // 1) the host suddenly loses the connection to Dad
   await host.evaluate(() => { for (const l of window.__game.session.links) l.close(); });
-  await wait(1500);
+  // (on the relay road the guest waits 1.5 s on purpose before letting go: see HANGUP_WAIT)
+  await guest.waitForFunction(() => window.__lost >= 1, null, { timeout: 5000, polling: 100 }).catch(() => {});
   const lost1 = await guest.evaluate(() => window.__lost);
   check(lost1 === 1, `guest noticed the dropped connection (lost events: ${lost1})`);
   await guest.waitForFunction(() => window.__game.session.connected, null, { timeout: 40000 }).catch(() => {});

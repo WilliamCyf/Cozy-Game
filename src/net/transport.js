@@ -47,8 +47,8 @@ const dbg = params.has('netdebug') ? (...a) => console.log('[dbg] net', ...a) : 
 // connection of the same player replaced it) is invisible to that phone: the room stays open.
 // So the host says so with this tiny signal. (Not JSON: older versions of the game just ignore it.)
 const HANGUP = '\u0000hangup';
-// After a hang-up the guest waits a moment before joining the room again: the host's side is still
-// tidying away the old connection, and joining in the middle of that can stall the handshake for ~25 s.
+// After a hang-up the guest waits a moment before letting go and joining again: joining straight
+// away can stall the handshake for ~25 s.
 const HANGUP_WAIT = 1500; // (measured: joining at once stalled 3 times in 8; after 1.5 s, 0 times in 20)
 const useTry = !params.has('notry');
 
@@ -330,10 +330,10 @@ export function joinHost(code, timeoutMs = 20000, signal = null) {
         act.onMessage = (data, meta) => {
           const peerId = meta?.peerId ?? meta;
           if (!link || peerId !== hostId) return;
-          if (data === HANGUP) { // noticed at once, and reconnects like any drop
+          if (data === HANGUP) { // reconnects like any drop, after a moment (see HANGUP_WAIT)
             dbg('guest: the host hung up');
-            link.dropped(); // (this leaves the room)
-            roomLeaving = roomLeaving.then(() => new Promise((r) => setTimeout(r, HANGUP_WAIT))); // joining it again waits a moment
+            const l = link;
+            setTimeout(() => l.dropped(), HANGUP_WAIT); // (dropping starts the rejoin at once, so the pause comes first)
             return;
           }
           link.receive(data);
