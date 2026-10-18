@@ -69,6 +69,10 @@ export function migrate(saved, fresh) {
   out.feed = Array.isArray(saved.feed) ? saved.feed.slice(-30) : [];
   out.stickers = Array.isArray(saved.stickers) ? saved.stickers : [];
   out.name = typeof saved.name === 'string' && saved.name.trim() ? shortText(saved.name, 24) : fresh.name; // (24 letters, like a_rename)
+  // the family island's books belong to the saved island only (a fresh island's books would make it a
+  // different island): an island saved before family islands gets its books later, from its own numbers
+  if (saved.vx && typeof saved.vx === 'object') out.vx = saved.vx;
+  else delete out.vx;
   out.v = SCHEMA;
   return out;
 }

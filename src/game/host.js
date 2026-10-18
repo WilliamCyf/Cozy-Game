@@ -18,6 +18,12 @@ export function hourRate(h) {
 }
 
 const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+// a number from a word (the same word always gives the same number), for choices every copy must agree on
+function seedOf(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h;
+}
 
 // A look sent by a phone: only the known parts, as short text (so nothing odd can reach the drawing code)
 const LOOK_KEYS = ['skin', 'shirt', 'accent', 'hair', 'hat'];
@@ -43,7 +49,9 @@ export class HostLogic {
     }
   }
   get s() { return this.session.state; }
-  ops(list) { this.session.emitOps(list); }
+  // auto: a change nobody made by hand (growth, regrowth, rain, a new day). Once this phone has stopped
+  // leading (dead), nothing more is written, not even by a timer that was already waiting.
+  ops(list, auto = false) { if (!this.dead) this.session.emitOps(list, auto); }
   fx(f) { this.session.emitFx(f); }
   // News and replies travel to phones that may use another language, so they are message
   // objects made with T() (or plain English sentences); each phone shows them in its own language with tr().
@@ -53,11 +61,15 @@ export class HostLogic {
   // ---------------------------------------------------------------- time passes
   tick(dt) {
     const s = this.s;
+    if (this.dead) return;
     s.clock += dt;
     const prev = s.time;
     s.time += hourRate(s.time) * dt;
     if (s.time >= 24) s.time -= 24;
     if (prev < 6 && s.time >= 6) this.newDay();
+    // the first seconds after opening a stored copy, while still looking for the family: no automatic
+    // changes yet (an old copy must not ripen crops or regrow fruit the family already picked)
+    if (this.quietUntil && performance.now() < this.quietUntil) return;
     const hour = Math.floor(s.time);
     if (hour !== this.lastHour) {
       this.lastHour = hour;
@@ -74,16 +86,16 @@ export class HostLogic {
       if (!(p.water || raining)) return;
       p.grow = (p.grow || 0) + step;
       if (p.grow >= CROPS[p.crop].stage) {
-        this.ops([['set', ['plots', i], { ...p, stage: p.stage + 1, grow: 0, water: raining }]]);
+        this.ops([['set', ['plots', i], { ...p, stage: p.stage + 1, grow: 0, water: raining }]], true);
         if (p.stage + 1 === 3) this.fx({ kind: 'sparkle', x: this.world.plots[i].x, z: this.world.plots[i].z });
       }
     });
     // fruit regrows on bushes, coconuts on palms
     s.bushes.forEach((b, i) => {
-      if (b.fruit < 3 && s.clock >= b.t) this.ops([['set', ['bushes', i], { fruit: b.fruit + 1, t: s.clock + 75 }]]);
+      if (b.fruit < 3 && s.clock >= b.t) this.ops([['set', ['bushes', i], { fruit: b.fruit + 1, t: s.clock + 75 }]], true);
     });
     s.palms.forEach((p, i) => {
-      if (!p.ready && s.clock >= p.t) this.ops([['set', ['palms', i], { ready: true, t: 0 }]]);
+      if (!p.ready && s.clock >= p.t) this.ops([['set', ['palms', i], { ready: true, t: 0 }]], true);
     });
     // beach treasures wash up
     for (const cat of Object.keys(SPAWN_RULES)) {
@@ -97,7 +109,7 @@ export class HostLogic {
     const online = this.session.online.size;
     if (online > (s.stats.maxOnline || 1)) { this.ops([['max', ['stats', 'maxOnline'], online]]); this.checkStickers(); }
     if (raining && s.clock > s.weatherUntil) {
-      this.ops([['set', ['weather'], 'sun']]);
+      this.ops([['set', ['weather'], 'sun']], true);
       this.feed('🌈 The rain stopped. Look, a rainbow!');
       this.fx({ kind: 'rainbow' });
     }
@@ -106,28 +118,30 @@ export class HostLogic {
   hourly(hour) {
     const s = this.s;
     if (s.weather === 'sun' && hour >= 8 && hour <= 17 && Math.random() < 0.07) {
-      this.ops([['set', ['weather'], 'rain'], ['set', ['weatherUntil'], s.clock + 110 + Math.random() * 120]]);
+      this.ops([['set', ['weather'], 'rain'], ['set', ['weatherUntil'], s.clock + 110 + Math.random() * 120]], true);
       const wet = [];
       s.plots.forEach((p, i) => { if (p.crop && p.stage < 3 && !p.water) wet.push(['set', ['plots', i, 'water'], true]); });
-      this.ops(wet);
+      this.ops(wet, true);
       this.feed('🌧️ A gentle rain is watering the garden. Frogs love rain!');
     }
   }
 
   newDay() {
-    this.ops([['inc', ['day'], 1], ['inc', ['stats', 'days'], 1]]);
+    this.ops([['inc', ['day'], 1], ['max', ['stats', 'days'], this.s.day + 1]], true);
     this.feed(T('🌅 Good morning! Day {n} on the island.', { n: this.s.day }));
     this.newRequest();
     this.feed('🐢 Captain Shelly has a new request at the shop!');
   }
 
+  // (chosen from the island's id and the day, so every family member's copy asks for the same thing)
   newRequest() {
     const s = this.s;
     const ok = REQUESTS.filter((r) => !r.needs || s.projects[r.needs]?.done);
     const prev = s.request?.item;
-    let r = ok[Math.floor(Math.random() * ok.length)];
+    const pick = mulberry32(seedOf((s.vx?.vid || s.code || '') + ':' + s.day))();
+    let r = ok[Math.floor(pick * ok.length)];
     if (r.item === prev && ok.length > 1) r = ok[(ok.indexOf(r) + 1) % ok.length];
-    this.ops([['set', ['request'], { day: s.day, item: r.item, n: r.n, reward: r.reward, bonus: r.bonus || null, done: false }]]);
+    this.ops([['set', ['request'], { day: s.day, item: r.item, n: r.n, reward: r.reward, bonus: r.bonus || null, done: false }]], true);
   }
 
   // which basket items count for a need like "anyFish" (cheapest first)
@@ -302,7 +316,7 @@ export class HostLogic {
     const p = this.s.plots[req.i];
     if (!p?.crop || p.stage >= 3) return { ok: false };
     if (p.water) return { ok: true, msg: 'Already watered. Plants are happy!' };
-    this.ops([['set', ['plots', req.i, 'water'], true]]);
+    this.ops([['set', ['plots', req.i, 'water'], true]], true); // (watering only helps: it never overwrites a newer planting)
     this.fx({ kind: 'water', x: this.world.plots[req.i].x, z: this.world.plots[req.i].z, pid });
     return { ok: true };
   }
@@ -500,7 +514,7 @@ export class HostLogic {
     const s = this.s;
     if (s.mail.day >= s.day) return { ok: false, msg: 'No new letters today. Check again tomorrow!' };
     const letter = LETTERS[(s.day - 1) % LETTERS.length];
-    const ops = [['set', ['mail', 'day'], s.day]];
+    const ops = [['max', ['mail', 'day'], s.day]];
     for (const [k, n] of Object.entries(letter.gift)) ops.push(k === 'coins' ? ['inc', ['coins'], n] : this.give(k, n));
     this.ops(ops);
     return { ok: true, letter };
@@ -512,7 +526,7 @@ export class HostLogic {
     if (s.treasure.day >= s.day) return { ok: false, msg: 'Already dug up today’s treasure. More tomorrow!' };
     const coins = randInt(60, 140);
     const bonus = ['seaglass', 'coral', 'lure', 'seed:pumpkin'][Math.floor(Math.random() * 4)];
-    this.ops([['set', ['treasure', 'day'], s.day], ['inc', ['coins'], coins], ['inc', ['stats', 'earned'], coins], ['inc', ['stats', 'treasures'], 1], this.give(bonus, 1)]);
+    this.ops([['max', ['treasure', 'day'], s.day], ['inc', ['coins'], coins], ['inc', ['stats', 'earned'], coins], ['inc', ['stats', 'treasures'], 1], this.give(bonus, 1)]);
     this.feed(T('🏴‍☠️ {name} dug up buried treasure: {coins} coins and a {item}!', { name: this.playerName(pid), coins, item: T(ITEMS[bonus].name) }));
     this.fx({ kind: 'pop', x: DIG_SPOT.x, z: DIG_SPOT.z, item: 'chest', pid });
     void req;
@@ -523,7 +537,7 @@ export class HostLogic {
     const allowed = ['wave', 'heart', 'dance', 'cheer', 'sit', 'laugh', 'sleep'];
     if (!allowed.includes(req.e)) return { ok: false };
     this.fx({ kind: 'emote', pid, e: req.e });
-    if (req.e === 'sit') setTimeout(() => this.checkPicnic(pid), 600);
+    if (req.e === 'sit') setTimeout(() => { if (!this.dead) this.checkPicnic(pid); }, 600);
   }
 
   // Family picnic: 2+ people sitting together at the picnic spot (once a day)
@@ -537,7 +551,7 @@ export class HostLogic {
       if (p && Math.hypot(p[0] - cx, p[1] - cz) < 6 && p[3] === 2) n++; // 2 = sitting animation
     }
     if (n < 2) return;
-    this.ops([['set', ['picnicDay'], s.day], ['inc', ['coins'], 30], ['inc', ['stats', 'picnics'], 1], ['inc', ['stats', 'earned'], 30]]);
+    this.ops([['max', ['picnicDay'], s.day], ['inc', ['coins'], 30], ['inc', ['stats', 'picnics'], 1], ['inc', ['stats', 'earned'], 30]]);
     this.feed(T('🧺 Family picnic! {n} of you sat together. Everyone feels cozy. +30 coins', { n }));
     this.fx({ kind: 'picnic', pid });
     this.checkStickers();
