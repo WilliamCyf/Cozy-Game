@@ -1,6 +1,9 @@
-// The host's rule book. Only the host phone runs this.
-// Players send requests ("I'd like to sell 3 shells"); the host checks the ledger,
+// The rule book. It runs on the phone that is leading the game right now (any family member's phone:
+// whoever opened the village first; if they leave, another phone takes over).
+// Players send requests ("I'd like to sell 3 shells"); the leading phone checks the ledger,
 // and if it's allowed, writes the ops (journal entries) that everyone applies.
+// The ops are written so that two copies of the village can always be merged (see village.js):
+// counts go up and down with 'inc', records only grow with 'max', collections only grow with 'add'.
 import { CROPS, ITEMS, FISH_BY_ID, RECIPES, SHOP, PROJECTS, PROJECT_BY_ID, LETTERS, BOTTLE_NOTES, JOURNAL_FISH, REQUESTS, STICKERS } from './data.js';
 import { PICNIC } from '../world/layout.js';
 import { SPAWN_RULES, DIG_SPOT } from './spawns.js';
@@ -92,7 +95,7 @@ export class HostLogic {
     }
     // how many family members at once (for the Full House sticker)
     const online = this.session.online.size;
-    if (online > (s.stats.maxOnline || 1)) { this.ops([['set', ['stats', 'maxOnline'], online]]); this.checkStickers(); }
+    if (online > (s.stats.maxOnline || 1)) { this.ops([['max', ['stats', 'maxOnline'], online]]); this.checkStickers(); }
     if (raining && s.clock > s.weatherUntil) {
       this.ops([['set', ['weather'], 'sun']]);
       this.feed('🌈 The rain stopped. Look, a rainbow!');
@@ -158,8 +161,7 @@ export class HostLogic {
     return { ok: true, reward: r.reward, bonus: r.bonus };
   }
 
-  a_rename(pid, req) {
-    if (pid !== this.session.pid) return { ok: false, msg: 'Only the host can rename the island.' };
+  a_rename(pid, req) { // (the village belongs to the whole family: anyone may name it)
     const name = shortText(String(req.name || '').slice(0, 96), 24);
     if (!name) return { ok: false };
     this.ops([['set', ['name'], name]]);
@@ -176,7 +178,7 @@ export class HostLogic {
       let ok = false;
       try { ok = !!st.test(s, FISH_BY_ID); } catch { ok = false; }
       if (ok) {
-        this.ops([['push', ['stickers'], st.id, 100]]);
+        this.ops([['add', ['stickers'], st.id]]);
         this.feed(T('🏅 New sticker for the family: {e} {name}!', { e: st.emoji, name: T(st.name) }));
       }
     }
@@ -219,9 +221,12 @@ export class HostLogic {
 
   a_hello(pid, req) {
     const prev = this.s.players[pid];
-    const rec = { name: cleanName(req.name), look: cleanLook(req.look), caught: prev?.caught || 0, joined: prev?.joined || Date.now() };
-    this.ops([['set', ['players', pid], rec]]);
-    if (!prev) this.feed(T('🏝️ {name} moved onto the island!', { name: rec.name }));
+    const name = cleanName(req.name), look = cleanLook(req.look);
+    // (name and look are replaced, the first day only goes earlier, and the fish count is a family count)
+    const ops = [['set', ['players', pid, 'name'], name], ['set', ['players', pid, 'look'], look], ['min', ['players', pid, 'joined'], prev?.joined || Date.now()]];
+    if (prev?.left) ops.push(['set', ['players', pid, 'left'], null]); // back in the family
+    this.ops(ops);
+    if (!prev || prev.left) this.feed(T('🏝️ {name} moved onto the island!', { name }));
   }
 
   a_look(pid, req) {
@@ -340,7 +345,8 @@ export class HostLogic {
     const record = j && size > j.best;
     ops.push(this.give('fish:' + f.id, 1));
     if (!f.junk) {
-      ops.push(['set', ['journal', f.id], { n: (j?.n || 0) + 1, best: Math.max(size, j?.best || 0), by: j?.by || s.players[pid]?.name || 'Someone', first: j?.first || Date.now() }]);
+      if (!j) ops.push(['set', ['journal', f.id, 'by'], s.players[pid]?.name || 'Someone'], ['set', ['journal', f.id, 'first'], Date.now()]);
+      ops.push(['inc', ['journal', f.id, 'n'], 1], ['max', ['journal', f.id, 'best'], size]);
       ops.push(['inc', ['stats', 'fish'], 1]);
       ops.push(['inc', ['players', pid, 'caught'], 1]);
     }
@@ -383,7 +389,7 @@ export class HostLogic {
     if (!hat) return { ok: false };
     if (this.s.hats.includes(hat.id)) return { ok: true };
     if (this.s.coins < hat.price) return { ok: false, msg: 'Not enough coins in the family jar.' };
-    this.ops([['inc', ['coins'], -hat.price], ['set', ['hats'], [...this.s.hats, hat.id]]]);
+    this.ops([['inc', ['coins'], -hat.price], ['add', ['hats'], hat.id]]);
     this.feed(T('🎩 The family unlocked the {hat}!', { hat: T(hat.name) }));
     return { ok: true };
   }
@@ -482,7 +488,7 @@ export class HostLogic {
 
   completeProject(p) {
     const ops = [['set', ['projects', p.id, 'done'], true]];
-    if (p.id === 'festival' && !this.s.hats.includes('crown')) ops.push(['set', ['hats'], [...this.s.hats, 'crown']]);
+    if (p.id === 'festival') ops.push(['add', ['hats'], 'crown']);
     this.ops(ops);
     this.feed(T('🎉 Family project complete: {name}! {reward}', { name: T(p.name), reward: T(p.reward) }));
     this.fx({ kind: 'project', id: p.id });

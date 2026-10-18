@@ -92,6 +92,13 @@ export function applyOp(state, op) {
     if (!Array.isArray(o[k])) o[k] = [];
     o[k].push(clone(v));
     if (extra && o[k].length > extra) o[k].splice(0, o[k].length - extra);
+  } else if (kind === 'max') { // keep the bigger (a record size, the most players at once)
+    if (!(o[k] >= v)) o[k] = v;
+  } else if (kind === 'min') { // keep the smaller (when someone first joined)
+    if (!(o[k] <= v)) o[k] = v;
+  } else if (kind === 'add') { // add to a collection once (hats, stickers)
+    if (!Array.isArray(o[k])) o[k] = [];
+    if (!o[k].includes(v)) o[k].push(v);
   }
 }
 
