@@ -39,15 +39,24 @@ Pick **one** option:
 2. Tap the **Share** button (square with an arrow ⬆︎) → **Add to Home Screen** → **Add**.
 3. Open **Cozy Cove** from the Home Screen. It runs full-screen like a real app and works offline.
 
-## 3. Play together (up to 4 players)
+## 3. A family island (up to 4 playing at the same time)
 
-1. One person (the **host**) taps **🏝️ Play on our island**. The island is saved on *this* phone,
-   so it's best if the same person hosts each time.
-2. On the host's phone: menu **☰** → **Family & Invite** shows the island code: a picture and
+The island belongs to the **whole family**: every family member's phone keeps its own copy, so
+anyone can play **any time**, even when nobody else is around. When you play at the same time, you
+play together, and everything anyone did on their own joins up when the phones meet again.
+
+1. **Once:** one person taps **🌱 Start a new family island** (on a phone that already had an island
+   before this update, the game asks once: "is this your family's island?").
+2. In that game: menu **☰** → **Family & Invite** shows the island code: a picture and
    3 numbers, e.g. **🐢 TURTLE 482**.
-3. Everyone else taps **🤝 Join family**, **taps the same picture** (🐢) and types the **3 numbers**.
-   It joins by itself — no English letters to read or type.
-4. Being on the **same Wi‑Fi** works best. (Some mobile networks block direct phone-to-phone
+3. On every other phone: **🤝 Join your family**, **tap the same picture** (🐢) and type the
+   **3 numbers**. It joins by itself — no English letters to read or type. From then on that phone
+   just taps **🏝️ Play**.
+4. Nobody is the "host": if the phone that started the game goes away, the others just keep playing.
+5. Moving to another family: **🤝 Join another family** on the start screen (or ☰ → Settings →
+   **🧳 Move out of this family island…**). The island you leave is kept safe on the phone:
+   **↩️ Back to …** on the start screen brings it back.
+6. Being on the **same Wi‑Fi** works best. (Some mobile networks block direct phone-to-phone
    connections; if a phone on mobile data can't join, switch it to Wi‑Fi.)
 
 ## 4. English and Thai · ภาษาไทย
@@ -73,7 +82,7 @@ Pick **one** option:
 | 📖 **Fish Journal** | 27 kinds of fish to discover — some only at night, at sunset, in the rain, or in special places. |
 | 🏅 **Sticker Book** | 22 family awards to collect together (Journal → Stickers). |
 | 🧺 **Picnic** | Sit together on the picnic blanket (2+ people) for a small daily bonus. |
-| 🏝️ **Island name** | The host can name your island in ☰ → Family & Invite. |
+| 🏝️ **Island name** | Anyone in the family can name your island in ☰ → Family & Invite. |
 
 ## 6. New versions (updates)
 
@@ -112,13 +121,18 @@ default for new phones; phones that played before keep *Cool & cozy*), or *Batte
 * **Multiplayer without a game server:** the phones talk **directly** to each other (WebRTC). To find
   each other they briefly use two free "matchmakers" at the same time — PeerJS and Trystero (Nostr
   relays) — and whichever answers first wins, so if one is down the other still works.
-* **One shared ledger:** the host phone keeps the official record of the island. Every change
-  (e.g. "+1 sardine in the basket") is a small entry the host sends to everyone, and every phone applies
-  the same entries in the same order — like a family accounting journal — so all copies always match.
+* **One family ledger, on every phone:** while the family plays together, one phone (whichever is
+  playing first) runs the rules. Every change (e.g. "+1 sardine in the basket") is a small entry it
+  sends to everyone, and every phone applies the same entries in the same order — like a family
+  accounting journal — so all copies match. If that phone goes away, the next phone takes over.
+* **Copies that were played apart merge:** each phone writes its earnings and spending in its *own
+  column* of the books (`src/game/village.js`), so merging two copies is "take the newest version of
+  every column", and every total is the sum of the columns: nothing is lost or counted twice.
+  Things a person replaces (planting a plot, the island's name) keep the newest change.
 * **Home-screen app:** a web manifest + service worker make it installable and playable offline.
 * **Sound:** all music and sound effects are synthesized live (Web Audio) — no audio files.
 * **Two languages:** every English sentence is looked up in a Thai "dictionary" (`src/i18n/th/`).
-  The host sends news as a *recipe* (`"{name} caught a {fish}!"` + the names) instead of finished
+  The leading phone sends news as a *recipe* (`"{name} caught a {fish}!"` + the names) instead of finished
   words, and each phone cooks it in its own language. Thai letters use the rounded **Mali** font
   (~15 KB, only downloaded when Thai is on screen).
 
@@ -131,7 +145,8 @@ npm run serve          # http://localhost:8080
 npm run dev            # rebuild automatically while editing
 ```
 
-Useful URL flags while testing: `?autostart=host&name=Mom&notut&debug&fps&perf`.
+Useful URL flags while testing: `?autostart=host&name=Mom&notut&debug&fps&perf` (`autostart=host`:
+play this phone's island, or a new one; `autostart=new`: a brand-new island; `join=CODE`; `netdebug`).
 
 Tests (Playwright, using local stand-ins for the matchmakers):
 
@@ -142,8 +157,12 @@ node tests/join-pictures.mjs # Mum joins from a Thai phone with a picture code
 node tests/lang-switch.mjs   # English phone -> Thai and back: title, menu, Settings, mid-game
 node tests/update.mjs        # new versions reach phones (pretend GitHub Pages, offline too)
 node tools/i18n-check.mjs    # every text has Thai, {placeholders} match
-node tests/mp.mjs both       # 4 players + a 5th who is turned away
-node tests/reconnect.mjs     # dropped connections and a sleeping host
+node tests/village.mjs       # the family books: thousands of random histories, merges, crashes
+node tests/family.mjs both   # start, join, the leading phone leaves, someone takes over, merging
+node tests/family-moves.mjs  # old islands, moving to another family and back
+node tests/versions.mjs      # the version before family islands and this one: clear messages
+node tests/mp.mjs both       # 4 players + a 5th who plays on her own copy for now
+node tests/reconnect.mjs     # dropped connections and a frozen leading phone (both|peer|relay)
 node tests/touch.mjs         # real touch: joystick, button, pinch
 node tests/reach.mjs         # can you walk everywhere you should (and nowhere you shouldn't)?
 node tests/perf.mjs          # time per frame in busy places
@@ -157,7 +176,7 @@ src/
   render/            renderer (frame cap, auto resolution), camera, shaders, textures, shape builder
   world/             island blueprint, terrain, props (trees, cottage, docks…), walking map
   entities/          characters (1 draw call each), name tags, blob shadows
-  game/              rules (host), ledger, session, players, fishing, garden, critters, effects…
+  game/              rules, ledger, family books (village.js), session, players, fishing, garden…
   net/               finding each other + talking (PeerJS + Trystero)
   ui/                HUD, panels, screens, fish drawings
   i18n/              languages: t() / T() / tr(), Thai translations in th/

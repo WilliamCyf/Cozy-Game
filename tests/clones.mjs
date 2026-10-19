@@ -92,7 +92,7 @@ try {
   await a.goto(base);
   await a.waitForSelector('.screen.title', { timeout: 90000 });
   await wait(800);
-  await a.tap('.title-buttons .btn.ghost'); // "👕 Mum's look"
+  await a.getByRole('button', { name: /’s look/ }).tap(); // "👕 Mum's look"
   await a.waitForSelector('.look-editor');
   await wait(800);
   await a.tap('.look-editor .btn.primary'); // save -> back to the title

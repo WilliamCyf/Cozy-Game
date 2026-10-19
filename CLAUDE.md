@@ -19,9 +19,20 @@ Check every change against this before calling it done:
 - Phones keep a copy of the game (service worker). After changing src/sw.js or the update code,
   run `node tests/update.mjs` (pretend GitHub Pages with its 10-minute caching).
 
+## Family islands (how playing together works)
+- Every family member's phone keeps its own copy of the island; there is no owner/"host" in the game
+  or its words. While several play at once, ONE phone leads (runs src/game/host.js, holds the meeting
+  place); the others visit. If it goes away, the next phone takes over (src/game/session.js).
+- Copies played apart are merged by src/game/village.js. New ops in host.js must stay mergeable:
+  counts with 'inc' (keys in counterKey), records with 'max'/'min', collections with 'add', things a
+  person replaces with 'set' on an lwwKey path; changes nobody made by hand pass auto=true (no stamp).
+  Run `node tests/village.mjs` after touching host.js ops, village.js or state.js.
+- Never throw an island away: moving out / joining another family / starting a new one archive it.
+- Network changes: run tests/family.mjs and tests/reconnect.mjs on every road (both, peer, try/relay).
+
 ## Languages (English + Thai)
 - `src/i18n/i18n.js`: `t('English text {x}', { x })` for text shown on this phone.
-- Text made on the host and sent to other phones: `T('English {x}', { x })` message objects,
+- Text made on the leading phone and sent to other phones: `T('English {x}', { x })` message objects,
   shown with `tr(msg)` on each phone in its own language. Nested names: `T(item.name)`.
 - Never build the key from a template literal (`t(\`Hi ${name}\`)` cannot be translated).
 - Same English word, two meanings? Add a context: `t('action|Fish')` (English shows "Fish").

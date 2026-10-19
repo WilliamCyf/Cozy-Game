@@ -107,6 +107,23 @@ try {
   check(all2.every((b) => b === all2[0]), 'all three phones have the very same books again');
 
   for (const ph of [mum, dad, kid]) await ph.p.screenshot({ path: `${out}/${mode}-${ph.name}.png` });
+
+  // ---- everyone goes back to the start screen, then all three press Play at the very same moment:
+  // nobody is there yet, so all three try to lead; they must sort it out into one island by themselves
+  for (const ph of [mum, dad, kid]) await S(ph, () => window.__game.leave());
+  await Promise.all([mum, dad, kid].map((ph) => until(ph, () => document.querySelector('.screen.title.in'), null, 30000)));
+  await wait(2500);
+  await Promise.all([mum, dad, kid].map((ph) => S(ph, () => { const b = document.querySelector('.screen.title.in .title-buttons .btn.primary'); b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); })));
+  let sorted = false, st = [];
+  for (let i = 0; i < 90 && !sorted; i++) {
+    await wait(500);
+    st = await Promise.all([mum, dad, kid].map((ph) => S(ph, () => window.__game ? [window.__game.session.phase, window.__game.session.online.size] : null).catch(() => null)));
+    sorted = st.every(Boolean) && st.filter((x) => x[0] === 'leading').length === 1 && st.filter((x) => x[0] === 'visiting').length === 2 && st.every((x) => x[1] === 3);
+  }
+  check(sorted, `all three pressed Play at once: one leads, two visit, all three together (${JSON.stringify(st)})`);
+  await wait(1500);
+  const all3 = await Promise.all([mum, dad, kid].map(books));
+  check(all3.every((b) => b === all3[0]), 'and all three have the very same books');
 } catch (e) {
   ok = false;
   console.log('FAIL exception', e.message);
