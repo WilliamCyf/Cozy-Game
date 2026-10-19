@@ -131,7 +131,11 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 .face + .face { margin-left: -8px; box-shadow: -2px 0 0 1px rgba(255, 248, 232, 0.95); }
 .face.add { background: transparent !important; border: 2px dashed var(--line2); color: var(--ink2); text-shadow: none; }
 .net-dot { position: absolute; right: -3px; top: -3px; width: 11px; height: 11px; border-radius: 50%; background: #f5cf4a; border: 2px solid var(--cream); }
-.net-dot.ok { background: var(--green); }
+.net-dot.online { background: var(--green); }
+.net-dot.offline, .net-dot.alone { background: #b8b0a2; }
+.net-dot.finding { animation: net-blink 1.4s ease-in-out infinite; }
+.net-dot.update { width: 17px; height: 17px; right: -6px; top: -7px; font-size: 10px; line-height: 13px; text-align: center; background: #fff3d6; font-style: normal; }
+@keyframes net-blink { 50% { opacity: 0.35; } }
 /* most iPhones are 375-393 px wide: slim the top bar so clock, 4 faces, coins and menu all fit */
 @media (max-width: 400px) {
   .top { gap: 4px; padding-left: calc(var(--safe-l) + 6px); padding-right: calc(var(--safe-r) + 6px); }
@@ -405,6 +409,7 @@ input { font-family: inherit; -webkit-user-select: text; user-select: text; touc
 .logo-text { position: relative; font-size: 58px; font-weight: 700; color: #fff; letter-spacing: 1px; text-shadow: 0 4px 0 #1d8a93, 0 8px 18px rgba(0, 60, 80, 0.35); -webkit-text-stroke: 2px #1d8a93; }
 .logo-sub { display: inline-block; margin-top: 6px; background: var(--paper); border: 3px solid var(--line); border-radius: 16px; padding: 3px 14px; font-weight: 600; font-size: 15px; }
 .title-buttons { width: min(88vw, 360px); display: flex; flex-direction: column; gap: 12px; margin-top: auto; margin-bottom: 14px; }
+.col-buttons { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 6px; }
 .lang-btn { position: absolute; top: calc(var(--safe-t) + 12px); right: calc(var(--safe-r) + 14px); z-index: 2; padding: 8px 14px; border-radius: 999px; background: rgba(255, 253, 246, 0.92); border: 3px solid var(--line); font-weight: 600; font-size: 16px; box-shadow: 0 3px 0 rgba(90, 61, 43, 0.15); }
 .lang-screen { justify-content: center; background: rgba(32, 178, 198, 0.25); }
 .lang-card h2 { line-height: 1.25; }

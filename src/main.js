@@ -7,14 +7,14 @@ import { CameraRig } from './render/camera.js';
 import { U } from './render/materials.js';
 import { buildWorld } from './world/world.js';
 import { computeSpawnPoints } from './game/spawns.js';
-import { Session } from './game/session.js';
+import { Session, openIsland, isRealIsland, loadArchive, archiveIsland, takeFromArchive } from './game/session.js';
 import { Game } from './game/game.js';
 import { DayNight } from './game/daynight.js';
 import { Character, SKIN_TONES, SHIRT_COLORS, ACCENT_COLORS, HAIR_COLORS } from './entities/character.js';
 import { Audio } from './audio/audio.js';
 import { Input } from './ui/input.js';
 import { Screens } from './ui/screens.js';
-import { loadIsland } from './game/state.js';
+import { loadIsland, saveIsland, SAVE_KEY } from './game/state.js';
 import { clamp } from './util/math.js';
 import * as L from './world/layout.js';
 import { getLang, setLang, t, tr, hasThai, BUILD_ID } from './i18n/i18n.js';
@@ -106,8 +106,10 @@ async function boot() {
     getProfile: () => profile,
     saveProfile: (p) => { profile = p; store.set('cozycove.profile', p); },
     ownedHats: () => loadIsland()?.hats || [],
-    onHost: () => startHost(),
+    onPlay: () => startPlay(),
+    onNew: () => startNew(),
     onJoin: (code) => startJoin(code),
+    onBack: (vid) => backTo(vid),
     back: () => { cancelStart(); if (!game) showTitle(); },
     audio,
     preview: (look) => setPreview(look),
@@ -116,7 +118,7 @@ async function boot() {
   canvas.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
     R.state.paused = true;
-    if (game?.session?.isHost) game.session.save();
+    game?.session?.save();
   });
   canvas.addEventListener('webglcontextrestored', () => location.reload());
   setupLifecycle();
@@ -132,10 +134,11 @@ async function boot() {
   // came back after an update/reload while playing? jump straight back in
   const resume = (() => { try { return JSON.parse(sessionStorage.getItem('cozycove.resume') || 'null'); } catch { return null; } })();
   const auto = params.get('autostart');
-  if (auto === 'host' || resume?.mode === 'host') startHost();
-  else if (params.get('join') || resume?.mode === 'guest') { const code = params.get('join') || resume.code; screens.connecting(code); startJoin(code); }
+  if (auto === 'new') startNew();
+  else if (auto === 'host' || resume?.mode === 'play' || resume?.mode === 'host') { keepOldIsland(); startPlay(); }
+  else if (params.get('join') || (resume?.mode === 'guest' && resume.code)) startJoin(params.get('join') || resume.code); // (a visitor from before this update: back to the family)
   else if (firstVisit) screens.langChooser((id) => changeLang(id)); // very first time: pick a language
-  else showTitle();
+  else oldIslandCheck(() => showTitle());
   if (justUpdated) setTimeout(() => (game ? game.ui.toast(t('Cozy Cove was updated to the newest version!'), '✨', 3200) : screens.flash(t('✨ Updated to the newest version!'))), game ? 4500 : 900);
 }
 
@@ -164,7 +167,40 @@ function showTitle() {
   if (game) return; // (a late tap from the title screen while the game is starting)
   if (updateWaiting) { applyUpdate(); return; } // a new version arrived while on another screen
   const saved = loadIsland();
-  screens.title(saved ? { day: saved.day, fish: Object.keys(saved.journal || {}).length, name: saved.name } : null);
+  const prev = loadArchive()[0]; // (the island this phone moved away from last: "Back to …")
+  screens.title({
+    island: saved ? { day: saved.day, fish: Object.keys(saved.journal || {}).length, name: saved.name } : null,
+    back: prev && prev.vx.vid !== saved?.vx?.vid ? { vid: prev.vx.vid, name: prev.name, day: prev.day } : null,
+  });
+}
+
+// ---------------------------------------------------------------- islands from before family islands
+// Until now one phone kept the island and the others visited it. Now every family member's phone keeps
+// a copy. The first time this version starts on a phone with an island from before, it asks (once)
+// whether that is the family's island. One opened just once by accident goes into the archive quietly.
+const removeIsland = () => { try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(SAVE_KEY + '.bak'); } catch { /* ignore */ } };
+function oldIslandCheck(then) {
+  const saved = loadIsland();
+  if (!saved || saved.vx) { then(); return; }
+  const s = openIsland(world); // (with its family books now: the same island id on every copy of it)
+  if (!isRealIsland(s)) {
+    if (archiveIsland(s)) removeIsland();
+    then();
+    return;
+  }
+  screens.familyChoice({ name: s.name, day: s.day, fish: Object.keys(s.journal || {}).length }, {
+    ours: () => { saveIsland(s, 'both'); then(); },
+    join: () => {
+      if (!archiveIsland(s)) { screens.flash(t('This phone is out of space, so the island couldn’t be saved. Free up some space on the iPhone.')); return; }
+      removeIsland();
+      screens.ensureProfile(() => screens.join());
+    },
+  });
+}
+// (it was being played when the game updated itself: it's this family's island, no need to ask)
+function keepOldIsland() {
+  const saved = loadIsland();
+  if (saved && !saved.vx) saveIsland(openIsland(world), 'both');
 }
 
 // A character standing on the deck so you can see your look on the title screen
@@ -190,36 +226,87 @@ function startGame(session) {
     saveProfileFn: (p) => { profile = p; store.set('cozycove.profile', p); },
     saveSettingsFn: (s) => store.set('cozycove.settings', s) });
   rig.setZoom(1);
-  try { sessionStorage.setItem('cozycove.resume', JSON.stringify({ mode: session.role, code: session.code })); } catch { /* ignore */ }
+  try { sessionStorage.setItem('cozycove.resume', JSON.stringify({ mode: 'play' })); } catch { /* ignore */ }
   window.__game = game;
   if (updateWaiting) game.ui.updateReady(() => applyUpdate()); // a new version arrived before the game started
 }
 // Only ever ONE game at a time, however many times a button is tapped. Each start gets a ticket
 // number (like at a deli counter); a join that finishes late, after Cancel or after another start,
 // sees its ticket is out of date and quietly stops.
-let ticket = 0, joining = false, pendingJoin = null;
-function startHost() {
+let ticket = 0, joining = false, pendingJoin = null, pendingPeek = null;
+// "Play": this phone's copy of the family island, straight away (the family is found meanwhile)
+function startPlay(opts) {
   if (game) return;
   cancelStart();
   const session = makeSession();
-  session.startHost();
+  session.play(opts);
   startGame(session);
   navigator.storage?.persist?.().catch(() => {}); // ask the phone to keep the island safe when space runs low
 }
+function startNew() {
+  if (game) return;
+  cancelStart();
+  const session = makeSession();
+  session.startNew();
+  startGame(session);
+  navigator.storage?.persist?.().catch(() => {});
+}
 function cancelStart() {
   ticket++; joining = false;
-  pendingJoin?.cancel(); // a join still on its way stops (and never says hello to the host)
+  pendingJoin?.cancel(); // a join still on its way stops (and never says hello to the leading phone)
   pendingJoin = null;
+  pendingPeek?.abort();
+  pendingPeek = null;
   if (!game) { try { sessionStorage.removeItem('cozycove.resume'); } catch { /* ignore */ } } // (no jumping back in after a reload)
 }
+// what went wrong while joining, in this phone's language
+function joinError(e) {
+  if (e?.kick?.msg) return tr(e.kick.msg); // (a "no" from the leading phone: English, or a message object)
+  if (e?.why === 'noanswer') return t('That phone didn’t answer. Make sure both phones have the newest version of Cozy Cove.');
+  if (e?.why === 'nospace') return t('This phone is out of space, so the island couldn’t be saved. Free up some space on the iPhone.');
+  return t('Couldn’t find that island. Check the code, and make sure Cozy Cove is open on a family member’s phone (same Wi-Fi works best).');
+}
+// "Join your family": first a look at the island (nothing changes yet), then join it.
 async function startJoin(code) {
+  if (game || joining) return;
+  cancelStart();
+  joining = true;
+  const mine = ticket;
+  screens.connecting(code);
+  const abort = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  pendingPeek = abort;
+  let info;
+  try {
+    info = await Session.peek(code, abort?.signal);
+  } catch (e) {
+    if (mine !== ticket || game) return;
+    joining = false;
+    pendingPeek = null;
+    screens.join(code, joinError(e));
+    if (e?.why === 'version' || e?.why === 'noanswer') checkForUpdate(true); // maybe this phone is the old one: fetch the new version
+    return;
+  }
+  if (mine !== ticket || game) { info.link.close(); return; }
+  pendingPeek = null;
+  const here = openIsland(world);
+  if (here && here.vx.vid === info.vid) { info.link.close(); joining = false; startPlay(); return; } // it is this phone's family island already
+  if (here && isRealIsland(here)) { // moving to another family: ask first (this island is kept safe)
+    joining = false;
+    screens.moveCard(info, { name: here.name, day: here.day }, { move: () => joinNow(code, here, info.link), stay: () => { info.link.close(); showTitle(); } });
+    return;
+  }
+  joining = false;
+  joinNow(code, here, info.link);
+}
+async function joinNow(code, old, peeked = null) {
   if (game || joining) return;
   joining = true;
   const mine = ++ticket;
+  screens.connecting(code);
   const session = makeSession();
   pendingJoin = session;
   try {
-    await session.join(code);
+    await session.joinFamily(code, old, peeked);
     if (pendingJoin === session) pendingJoin = null;
     if (params.has('debug') && window.__slowJoin) await new Promise((r) => setTimeout(r, window.__slowJoin)); // (tests only: a slow phone)
     if (mine !== ticket || game) { session.leave(); return; }
@@ -230,11 +317,23 @@ async function startJoin(code) {
     if (mine !== ticket || game) return;
     joining = false;
     try { sessionStorage.removeItem('cozycove.resume'); } catch { /* ignore */ }
-    // a "no" from the host arrives as a message object (or English text from an older host): show it in this phone's language
-    const msg = tr(e?.kick?.msg) || t('Couldn’t find that island. Check the code, and make sure Cozy Cove is open on the host’s phone (same Wi-Fi works best).');
-    screens.join(code, msg);
-    if (e?.kick?.why === 'version') checkForUpdate(true); // maybe this phone is the old one: fetch the new version
+    screens.join(code, joinError(e));
+    if (e?.kick?.why === 'version') checkForUpdate(true);
   }
+}
+// "↩️ Back to …": the island this phone moved away from becomes this phone's island again (the one it
+// has now goes into the archive in its place), and it is merged with the family's copy when they meet.
+function backTo(vid) {
+  if (game) return;
+  const s = takeFromArchive(vid);
+  if (!s) { showTitle(); return; }
+  const here = openIsland(world);
+  if ((here && here.vx.vid !== vid && !archiveIsland(here)) || !saveIsland(s, 'both')) {
+    archiveIsland(s); // (put it back: nothing is lost)
+    screens.flash(t('This phone is out of space, so the island couldn’t be saved. Free up some space on the iPhone.'));
+    return;
+  }
+  startPlay({ freshColumn: true });
 }
 
 // ---------------------------------------------------------------- the loop
@@ -292,16 +391,16 @@ function setupLifecycle() {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       R.state.paused = true;
-      if (game?.session?.isHost) game.session.save();
+      game?.session?.hide(); // (saves; a leading phone lets the family take over)
       input.reset();
     } else {
       R.state.paused = false;
       last = performance.now();
-      game?.session?.wake();
+      game?.session?.show();
       if (game) game.lastTouch = performance.now();
     }
   });
-  window.addEventListener('pagehide', () => { if (game?.session?.isHost) game.session.save(); });
+  window.addEventListener('pagehide', () => game?.session?.hide());
 }
 
 // ---------------------------------------------------------------- updates
@@ -354,7 +453,7 @@ function askCopyForFiles() {
   });
 }
 function applyUpdate() {
-  if (game?.session?.isHost) game.session.save();
+  game?.session?.leave(); // (saves; a leading phone lets the family take over while this one restarts)
   // (the resume note in sessionStorage brings a player straight back into their game)
   location.reload();
 }

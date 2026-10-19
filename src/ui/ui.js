@@ -204,9 +204,14 @@ export class UI {
     this.bite.classList.toggle('hidden', !on);
   }
 
-  setNet(text, ok) {
-    this.netDot.classList.toggle('ok', ok);
-    this.netDot.title = text;
+  // The little dot on the family faces: green = together with the family (or ready for them), yellow
+  // and blinking = finding the family, grey = no internet (playing on this phone), 📲 = update needed.
+  // (Asked a few times a second: nothing changes unless the state did.)
+  setNet(state) {
+    if (state === this.netState) return;
+    this.netState = state;
+    this.netDot.className = 'net-dot ' + state;
+    this.netDot.textContent = state === 'update' ? '📲' : '';
   }
 
   renderFamily() {

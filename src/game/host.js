@@ -1,8 +1,8 @@
 // The rule book. It runs on the phone that is leading the game right now (any family member's phone:
-// whoever opened the village first; if they leave, another phone takes over).
+// whoever opened the island first; if they leave, another phone takes over).
 // Players send requests ("I'd like to sell 3 shells"); the leading phone checks the ledger,
 // and if it's allowed, writes the ops (journal entries) that everyone applies.
-// The ops are written so that two copies of the village can always be merged (see village.js):
+// The ops are written so that two copies of the island can always be merged (see village.js):
 // counts go up and down with 'inc', records only grow with 'max', collections only grow with 'add'.
 import { CROPS, ITEMS, FISH_BY_ID, RECIPES, SHOP, PROJECTS, PROJECT_BY_ID, LETTERS, BOTTLE_NOTES, JOURNAL_FISH, REQUESTS, STICKERS } from './data.js';
 import { PICNIC } from '../world/layout.js';
@@ -175,7 +175,7 @@ export class HostLogic {
     return { ok: true, reward: r.reward, bonus: r.bonus };
   }
 
-  a_rename(pid, req) { // (the village belongs to the whole family: anyone may name it)
+  a_rename(pid, req) { // (the island belongs to the whole family: anyone may name it)
     const name = shortText(String(req.name || '').slice(0, 96), 24);
     if (!name) return { ok: false };
     this.ops([['set', ['name'], name]]);
@@ -236,11 +236,25 @@ export class HostLogic {
   a_hello(pid, req) {
     const prev = this.s.players[pid];
     const name = cleanName(req.name), look = cleanLook(req.look);
-    // (name and look are replaced, the first day only goes earlier, and the fish count is a family count)
-    const ops = [['set', ['players', pid, 'name'], name], ['set', ['players', pid, 'look'], look], ['min', ['players', pid, 'joined'], prev?.joined || Date.now()]];
+    // Only what changed: a family member who comes back looking the same changes nothing. (The name and
+    // look are replaced, the first day only goes earlier, and the fish count is a family count.)
+    const ops = [];
+    if (prev?.name !== name) ops.push(['set', ['players', pid, 'name'], name]);
+    if (JSON.stringify(prev?.look || null) !== JSON.stringify(look)) ops.push(['set', ['players', pid, 'look'], look]);
+    if (!prev?.joined) ops.push(['min', ['players', pid, 'joined'], Date.now()]);
     if (prev?.left) ops.push(['set', ['players', pid, 'left'], null]); // back in the family
-    this.ops(ops);
+    if (ops.length) this.ops(ops);
     if (!prev || prev.left) this.feed(T('🏝️ {name} moved onto the island!', { name }));
+  }
+
+  // Moving to another family's island: this island's list of who lives here no longer shows them
+  // (they can come back any time: saying hello again moves them back in).
+  a_moveOut(pid) {
+    const p = this.s.players[pid];
+    if (!p || p.left) return { ok: true };
+    this.ops([['set', ['players', pid, 'left'], Date.now()]]);
+    this.feed(T('🧳 {name} moved to another island. Come back any time!', { name: this.playerName(pid) }));
+    return { ok: true };
   }
 
   a_look(pid, req) {

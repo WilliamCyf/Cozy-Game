@@ -36,10 +36,13 @@ function trysteroConfig(code) {
 }
 const usePeer = !params.has('nopeer');
 // Leaving a Trystero room takes a moment; joining the same room again before that finishes gets the
-// old, closing room back. So a new join waits until the last room has really been left.
+// old, closing room back. And joining again straight after leaving can stall the handshake with the
+// phones still in the room for ~25 s (see HANGUP_WAIT). So a new join waits until the last room has
+// really been left, and a moment more.
+const REJOIN_WAIT = 1500;
 let roomLeaving = Promise.resolve();
 function leaveRoom(room) {
-  roomLeaving = Promise.resolve().then(() => room.leave()).catch(() => {});
+  roomLeaving = Promise.resolve().then(() => room.leave()).catch(() => {}).then(() => new Promise((r) => setTimeout(r, REJOIN_WAIT)));
   return roomLeaving;
 }
 const dbg = params.has('netdebug') ? (...a) => console.log('[dbg] net', ...a) : () => {};
@@ -117,11 +120,13 @@ class Link {
   }
 }
 
-// ------------------------------------------------------------------ hosting
+// ------------------------------------------------------------------ leading (holding the meeting place)
+// The phone that leads the family's game right now holds the island's "meeting place": its PeerJS name
+// and its Trystero room. Family phones that open the game look there first.
 export class HostTransport {
-  constructor(code, onLink, created = Date.now()) {
+  constructor(code, onLink, meetInfo = () => null) {
     this.code = code;
-    this.created = created;
+    this.meetInfo = meetInfo; // who we are, for when we meet another leading phone of the same island
     this.onLink = onLink;
     this.peer = null;
     this.room = null;
@@ -130,8 +135,8 @@ export class HostTransport {
     this.stopped = false;
     this.retry = null;
     this.onStatus = null;
-    this.onCollision = null; // another island is using our code
-    this.idTaken = 0;
+    this.onIdTaken = null; // someone already holds our PeerJS name (usually a family member's phone: go and meet it)
+    this.onHostMeet = null; // another phone leading this code showed up in the Trystero room
   }
   start() {
     if (usePeer) this.startPeer();
@@ -148,7 +153,7 @@ export class HostTransport {
       const peer = new Peer(PEER_PREFIX + this.code.toLowerCase(), peerOptions());
       this.peer = peer;
       let opened = false;
-      peer.on('open', () => { opened = true; this.peerOk = true; this.idTaken = 0; this.reconnectWait = 1500; this.onStatus?.(); });
+      peer.on('open', () => { opened = true; this.peerOk = true; this.takenWait = 0; this.reconnectWait = 1500; this.onStatus?.(); });
       peer.on('connection', (conn) => {
         let link = null;
         conn.on('open', () => {
@@ -178,17 +183,19 @@ export class HostTransport {
         // a hiccup on the line to the matchmaker: keep this peer (and every family member connected
         // through it); the 'disconnected' handler above reconnects it
         if (opened && !peer.destroyed && (t === 'network' || t === 'socket-error' || t === 'socket-closed' || t === 'disconnected')) return;
+        // our name is taken: by a family member's phone that leads too (the session goes to meet it), or
+        // by our own old connection that is still closing. Try again in a while, waiting longer each
+        // time (6 s .. 1 min), so a phone that keeps it for long doesn't cost battery.
+        let wait = 4000;
         if (t === 'unavailable-id') {
-          this.idTaken++;
-          // still taken after ~80 s (longer than the server's 60 s timeout for a crashed app):
-          // that's someone else's island, not our own old session
-          if (this.idTaken >= 13) { this.onCollision?.(); return; }
+          this.takenWait = Math.min((this.takenWait || 3000) * 2, 60000);
+          wait = this.takenWait;
+          this.onIdTaken?.();
         }
-        // try again in a little while (the old session may still be closing)
         try { peer.destroy(); } catch { /* ignore */ }
         if (!this.stopped) {
           clearTimeout(this.retry);
-          this.retry = setTimeout(() => this.startPeer(), t === 'unavailable-id' ? 6000 : 4000);
+          this.retry = setTimeout(() => this.startPeer(), wait);
         }
       });
     } catch (e) {
@@ -196,26 +203,37 @@ export class HostTransport {
     }
   }
   startTrystero() {
+    // (a room this phone was in a moment ago, e.g. while looking for the family, must be left first)
+    roomLeaving.then(() => { if (!this.stopped) this.joinTrystero(); });
+  }
+  joinTrystero() {
     try {
-      // Handshake: before two phones connect they say who they are. Hosts only accept guests,
-      // guests only accept a host — so guests never connect to each other (simpler & sturdier),
-      // and if two HOSTS meet, two islands share a code: the newer island picks a new one.
+      // Handshake: before two phones talk they say who they are. A leading phone only talks to visitors,
+      // visitors only talk to a leading phone (simpler and sturdier). Two LEADING phones don't talk here:
+      // each tells the session who the other is, and the session decides which one goes over to the
+      // other (see session.js). Nobody is turned away at the handshake itself, though: the relay road
+      // keeps a connection it saw turned away half-open for minutes, and the same two phones could then
+      // not reach each other later, when one of them leads. So the connection is simply not used.
+      // (c: a huge "created" time, so a phone with the older version never thinks its island is the
+      // newer one and changes its code because of us.)
+      const roles = new Map();
       const room = joinRoom(trysteroConfig(this.code), 'island-' + this.code.toLowerCase(), {
         onPeerHandshake: async (peerId, send, receive) => {
-          await send({ role: 'host', c: this.created });
+          const mine = this.meetInfo();
+          await send({ role: 'host', c: 9e15, m: mine });
           const { data } = await receive();
-          if (data?.role === 'host') {
-            if ((data.c || 0) <= this.created) this.onCollision?.();
-            throw new Error('two hosts');
-          }
+          roles.set(peerId, data?.role);
+          if (data?.role === 'host') this.onHostMeet?.(data.m || null, mine);
         },
         onJoinError: (d) => dbg('host: handshake refused', d?.error),
       });
+      if (this.stopped) { leaveRoom(room); return; }
       this.room = room;
       const act = room.makeAction('m');
       this.tryAct = act;
       room.onPeerJoin = (peerId) => {
-        dbg('host: peer join', peerId);
+        dbg('host: peer join', peerId, roles.get(peerId));
+        if (roles.get(peerId) !== 'guest') return; // (another leading phone: not talked to here)
         let link = this.tryLinks.get(peerId);
         if (link && !link.closed) return;
         link = new Link('trystero', (s) => act.send(s, { target: peerId }), () => { try { act.send(HANGUP, { target: peerId }); } catch { /* ignore */ } });
@@ -236,6 +254,14 @@ export class HostTransport {
       console.warn('trystero failed', e);
     }
   }
+  // The phone holding our PeerJS name is letting go of it (it is coming over to us): try again soon,
+  // not after the long wait.
+  peerSoon() {
+    if (!usePeer || this.stopped || this.peerOk) return;
+    clearTimeout(this.retry);
+    this.takenWait = 0;
+    this.retry = setTimeout(() => this.startPeer(), 1500);
+  }
   // After returning from the background: make sure we're still reachable.
   wake() {
     if (this.stopped) return;
@@ -252,10 +278,13 @@ export class HostTransport {
   }
 }
 
-// ------------------------------------------------------------------ joining
-// Resolves with a Link to the host, or rejects after `timeoutMs` (or when `signal` is aborted:
-// the player tapped Cancel, so everything this try opened is closed straight away).
-export function joinHost(code, timeoutMs = 20000, signal = null) {
+// ------------------------------------------------------------------ visiting
+// Resolves with a Link to the phone holding the island's meeting place, or rejects after `timeoutMs`
+// (or when `signal` is aborted: the player tapped Cancel, so everything this try opened is closed
+// straight away). roads: 'both', or 'peer' for a quick check on PeerJS only.
+// patience: give up this long after a road is really open (not counting the moment the phone was too busy
+// to start, e.g. while the game is being set up); timeoutMs stays the longest it can take in all.
+export function joinHost(code, timeoutMs = 20000, signal = null, { roads = 'both', patience = 0 } = {}) {
   return new Promise((resolve, reject) => {
     let done = false;
     const cleanups = [];
@@ -263,15 +292,19 @@ export function joinHost(code, timeoutMs = 20000, signal = null) {
       if (done) { if (link) link.close(); return; }
       done = true;
       clearTimeout(timer);
+      clearTimeout(patient);
       for (const c of cleanups) if (c.kind !== winner) c.fn();
       if (err) reject(err);
       else resolve(link);
     };
     const timer = setTimeout(() => finish(new Error('timeout')), timeoutMs);
+    let patient = null;
+    const roadOpen = () => { if (patience && !patient && !done) patient = setTimeout(() => finish(new Error('timeout')), patience); };
     if (signal?.aborted) { finish(new Error('cancelled')); return; }
     signal?.addEventListener('abort', () => finish(new Error('cancelled')), { once: true });
 
-    if (usePeer) {
+    const withPeer = usePeer, withTry = useTry && roads !== 'peer';
+    if (withPeer) {
       let peer;
       try {
         peer = new Peer(peerOptions());
@@ -290,7 +323,7 @@ export function joinHost(code, timeoutMs = 20000, signal = null) {
           conn.on('close', () => link?.dropped());
           conn.on('error', () => link?.dropped());
         };
-        peer.on('open', tryConnect);
+        peer.on('open', () => { roadOpen(); tryConnect(); });
         peer.on('error', (e) => {
           // host not there (yet)? keep trying for a bit — maybe they're just opening the app
           if (e?.type === 'peer-unavailable' && attempts < 6 && !done) setTimeout(tryConnect, 2500);
@@ -300,7 +333,7 @@ export function joinHost(code, timeoutMs = 20000, signal = null) {
       }
     }
 
-    if (useTry) {
+    if (withTry) {
       // (wait until a room we used before has really been left, or we would get that old room back)
       roomLeaving.then(() => { if (!done) joinTrystero(); });
     }
@@ -312,14 +345,14 @@ export function joinHost(code, timeoutMs = 20000, signal = null) {
           onPeerHandshake: async (peerId, send, receive) => {
             await send({ role: 'guest' });
             const { data } = await receive();
-            if (data?.role !== 'host') throw new Error('guests don\u2019t connect to each other');
-            hosts.add(peerId);
+            if (data?.role === 'host') hosts.add(peerId); // (another visitor: not talked to, see above)
           },
           onJoinError: (d) => dbg('guest: handshake refused', d?.error),
         });
         const act = room.makeAction('m');
         cleanups.push({ kind: 'trystero', fn: () => { try { leaveRoom(room); } catch { /* ignore */ } } });
         if (done) { leaveRoom(room); return; } // finished while we waited
+        roadOpen();
         room.onPeerJoin = (peerId) => {
           dbg('guest: peer join', peerId, hosts.has(peerId) ? '(host)' : '');
           if (link || !hosts.has(peerId)) return;
@@ -343,7 +376,7 @@ export function joinHost(code, timeoutMs = 20000, signal = null) {
         console.warn('trystero join failed', e);
       }
     }
-    if (!usePeer && !useTry) finish(new Error('no transport'));
+    if (!withPeer && !withTry) finish(new Error('no transport'));
   });
 }
 

@@ -14,7 +14,17 @@ import { ITEMS, CROPS, PROJECT_BY_ID, itemName } from './data.js';
 import { U } from '../render/materials.js';
 import * as L from '../world/layout.js';
 import { SAVE_KEY } from './state.js';
+import { archiveIsland } from './session.js';
 import { t, tr, islandName, CANVAS_FONT } from '../i18n/i18n.js';
+
+// Back to the start screen: the page starts again (cleanly), without any "start straight away" switch in
+// its address (those are for tests and links; they must not start the game again by themselves).
+function toStartScreen() {
+  const u = new URL(location.href);
+  for (const k of ['autostart', 'join']) u.searchParams.delete(k);
+  if (u.href === location.href) location.reload();
+  else location.replace(u.href);
+}
 
 const EMOTE_ICON = { wave: '👋', heart: '❤️', dance: '💃', cheer: '🎉', sit: '🪑', sleep: '💤', laugh: '😄' };
 // island news that can change what an open page shows (the page is then redrawn)
@@ -52,32 +62,58 @@ export class Game {
     session.on('ops', (ops) => this.onOps(ops));
     session.on('fx', (f) => this.onFx(f));
     session.on('players', () => { this.players.syncRoster(); this.ui.renderFamily(); });
-    session.on('joined', (pid) => { if (pid !== session.pid) { this.ui.toast(t('{name} arrived on the island!', { name: session.online.get(pid)?.name || t('Someone') }), '👋', 2600); this.audio.chime(); } });
-    session.on('left', (pid) => { const n = session.state.players[pid]?.name; if (n) this.ui.toast(t('{name} went home for now.', { name: n }), '🏡', 2200); });
+    // Arrivals and goodbyes: someone back within a few seconds (their phone took a moment, or another
+    // phone took over leading) isn't news, so a goodbye waits a little before it is shown.
+    this.goodbyes = new Map();
+    session.on('joined', (pid) => {
+      if (pid === session.pid) return;
+      const bye = this.goodbyes.get(pid);
+      if (bye) { clearTimeout(bye); this.goodbyes.delete(pid); return; }
+      if (session.quickReturn(pid)) return;
+      this.ui.toast(t('{name} arrived on the island!', { name: session.online.get(pid)?.name || t('Someone') }), '👋', 2600);
+      this.audio.chime();
+    });
+    session.on('left', (pid) => {
+      const n = session.state.players[pid]?.name;
+      if (!n || this.goodbyes.has(pid)) return;
+      this.goodbyes.set(pid, setTimeout(() => {
+        this.goodbyes.delete(pid);
+        if (!session.online.has(pid) && !this.leaving) this.ui.toast(t('{name} went home for now.', { name: n }), '🏡', 2200);
+      }, 9000));
+    });
+    // the whole island changed (a family member's copy was merged in): redraw what is open
+    session.on('state', () => {
+      this.ui.renderFamily();
+      const sh = this.ui.sheet;
+      if (sh && !(typeof sh.keep === 'function' ? sh.keep() : sh.keep)) this.ui.refreshSheet();
+    });
     session.on('snap', () => { if (session.lastSnapMsg?.cat) this.critters.setRemoteCat(session.lastSnapMsg.cat); });
     session.on('netstatus', () => this.ui.renderFamily());
     session.on('codechanged', (code) => {
       if (session.isHost) this.ui.toast(t('Another island was using our code, so we got a new one: {code}', { code }), '🔑', 6000);
-      // remember the new code, so coming back after an update finds the island again (host and guests)
-      try { sessionStorage.setItem('cozycove.resume', JSON.stringify({ mode: session.role, code })); } catch { /* ignore */ }
     });
     const saveFailed = () => this.ui.toast(t('This phone is out of space, so the island couldn’t be saved. Free up some space on the iPhone.'), '💾', 7000);
     session.on('savefail', saveFailed);
     if (session.saveWarned) setTimeout(saveFailed, 1500); // (the very first save, before this game existed, already failed)
-    session.on('lost', () => this.onLost());
+    // can't meet the family right now: say why once (the game goes on, on this phone's copy)
+    session.on('blocked', (why) => {
+      if (why === 'version') {
+        this.ui.toast(t('A family member’s phone has a different version of Cozy Cove. Update both phones to play together.'), '📲', 7000);
+        window.__checkForUpdate?.(true); // (maybe this phone is the old one: fetch the new version)
+      } else if (why === 'other') this.ui.toast(t('Another island is using our code right now, so the family can’t meet here for a while.'), '🔑', 7000);
+    });
+    session.on('full', () => this.ui.toast(t('4 family members are playing already. You’re playing on this phone for now; everything joins up later.'), '🏝️', 6000));
     // The island opened in a second window (another Safari tab)? Then this window stops saving at once,
     // so the two windows never overwrite each other's progress.
-    if (session.isHost) {
-      addEventListener('storage', (e) => {
-        if (e.key !== SAVE_KEY && e.key !== null) return;
-        if (this.leaving || session.wiped) return;
-        session.wiped = true;
-        this.leaving = true;
-        session.leave();
-        this.ui.showOverlay(`<div class="big-emoji">🪟</div><p>${escapeHTML(t('Cozy Cove was opened in another window, so this one stopped (nothing is lost). You can close this one.'))}</p>`, [[t('Back to menu'), () => this.backToMenu(), 'primary']]);
-      });
-    }
-    if (session.isHost) session.snapExtra = () => ({ cat: this.critters.catState() });
+    addEventListener('storage', (e) => {
+      if (e.key !== SAVE_KEY && e.key !== null) return;
+      if (this.leaving || session.wiped) return;
+      session.wiped = true;
+      this.leaving = true;
+      session.leave();
+      this.ui.showOverlay(`<div class="big-emoji">🪟</div><p>${escapeHTML(t('Cozy Cove was opened in another window, so this one stopped (nothing is lost). You can close this one.'))}</p>`, [[t('Back to menu'), () => this.backToMenu(), 'primary']]);
+    });
+    session.snapExtra = () => ({ cat: this.critters.catState() }); // (used only while this phone leads)
     session.posProvider = () => this.players.packet();
 
     this.players.syncRoster();
@@ -87,7 +123,7 @@ export class Game {
     // welcome
     setTimeout(() => {
       const s = session.state;
-      this.ui.toast(session.isHost ? t('Welcome home, {name}! Day {day} on {island}.', { name: this.profile.name, day: s.day, island: islandName(s.name) }) : t('Welcome to the family island, {name}!', { name: this.profile.name }), '🏝️', 3200);
+      this.ui.toast(t('Welcome home, {name}! Day {day} on {island}.', { name: this.profile.name, day: s.day, island: islandName(s.name) }), '🏝️', 3200);
       if ((s.mail?.day || 0) < s.day) setTimeout(() => this.ui.toast(t('There’s a letter in the mailbox by the cottage!'), '✉️', 3000), 3500);
     }, 600);
   }
@@ -398,61 +434,35 @@ export class Game {
     }, 'image/png');
   }
 
-  // ------------------------------------------------------------------ connection troubles (guests)
-  onLost() {
-    if (this.leaving) return;
-    if (this.fishing.active) this.fishing.stop();
-    const kick = this.session.kicked;
-    if (kick && ['closed', 'full', 'version', 'self', 'sent'].includes(kick.why)) {
-      const buttons = [[t('Back to menu'), () => this.backToMenu(), kick.why === 'version' ? 'ghost' : 'primary']];
-      if (kick.why === 'version') {
-        // phones on different versions can't play together: look for the new version right away
-        window.__checkForUpdate?.(true);
-        buttons.push([t('🔄 Update now'), () => { this.leaving = true; window.__applyUpdate ? window.__applyUpdate() : location.reload(); }, 'primary']);
-      }
-      this.ui.showOverlay(`<div class="big-emoji">🌙</div><p>${escapeHTML(tr(kick.msg))}</p>`, buttons);
-      return;
-    }
-    this.ui.showOverlay(`<div class="big-emoji">📡</div><p><b>${t('Lost the connection to the island…')}</b></p><p class="small">${t('Reconnecting. (Is the host’s phone awake?)')}</p><div class="spinner"></div>`, [[t('Back to menu'), () => this.backToMenu(), 'ghost']]);
-    this.reconnectLoop();
-  }
-  async reconnectLoop() {
-    const start = Date.now();
-    while (!this.leaving && !this.session.connected && Date.now() - start < 180000) {
-      try {
-        await this.session.reconnect();
-        this.ui.hideOverlay();
-        this.ui.toast(t('Back on the island!'), '🏝️', 2000);
-        this.players.syncRoster();
-        this.ui.renderFamily();
-        return;
-      } catch (e) {
-        if (e?.kick) { this.onLost(); return; }
-        await new Promise((r) => setTimeout(r, 2500));
-      }
-    }
-    if (!this.session.connected && !this.leaving) {
-      this.ui.showOverlay(`<div class="big-emoji">🏝️</div><p>${t('Couldn’t reach the island. Ask the host to open Cozy Cove, then try again.')}</p>`, [[t('Back to menu'), () => this.backToMenu(), 'primary']]);
-    }
-  }
-
   backToMenu() {
     this.leaving = true;
     try { sessionStorage.removeItem('cozycove.resume'); } catch { /* ignore */ }
-    location.reload();
+    toStartScreen();
   }
   leave() {
     this.leaving = true;
     this.session.leave();
     try { sessionStorage.removeItem('cozycove.resume'); } catch { /* ignore */ }
-    setTimeout(() => location.reload(), 500);
+    setTimeout(toStartScreen, 500);
   }
-  resetIsland() {
+  // "Move out of this family island": say goodbye on the island, keep it in this phone's archive (it can
+  // come back with "Back to …" on the start screen), and go back to the start screen.
+  async moveOut() {
+    if (this.leaving) return;
     this.leaving = true;
-    this.session.wiped = true; // leaving normally saves the island one last time: not this one
-    this.session.leave();
-    try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(SAVE_KEY + '.bak'); } catch { /* ignore */ }
-    setTimeout(() => location.reload(), 500);
+    const S = this.session;
+    await Promise.race([S.request({ a: 'moveOut' }), new Promise((r) => setTimeout(r, 2500))]);
+    S.flush();
+    S.save();
+    if (!archiveIsland(S.state)) { // (no space for the archive: then nothing changes, never lose an island)
+      this.leaving = false;
+      this.ui.toast(t('This phone is out of space, so the island couldn’t be saved. Free up some space on the iPhone.'), '💾', 7000);
+      return;
+    }
+    S.wiped = true; // (from now on, this island is only in the archive)
+    S.leave();
+    try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(SAVE_KEY + '.bak'); sessionStorage.removeItem('cozycove.resume'); } catch { /* ignore */ }
+    setTimeout(toStartScreen, 500);
   }
   // Settings → "Check for update". A new version downloads in the background; as soon as it is
   // ready, the "New version ready" button appears (see main.js).
@@ -510,10 +520,7 @@ export class Game {
     if (this.audioT <= 0) {
       this.audioT = 0.4;
       this.audio.setScene({ night: this.daynight.night, rain: this.daynight.rain, fallDist: Math.hypot(P.x - L.WATERFALL.x - 2, P.z - L.WATERFALL.z) });
-      if (S.isHost && this.ui.toasts.length === 0 && S.transport) {
-        const stn = S.transport.status();
-        this.ui.setNet(stn.peer || stn.trystero ? 'online' : 'offline', stn.peer || stn.trystero);
-      } else if (!S.isHost) this.ui.setNet(S.connected ? 'online' : 'offline', S.connected);
+      this.ui.setNet(S.netState());
     }
 
     // save power: if nobody has touched the screen for a while, slow down the frame rate

@@ -8,7 +8,7 @@ import { splitCode } from '../net/transport.js';
 import { fishSVG } from './fishart.js';
 import { QUALITY } from '../render/renderer.js';
 import { canSpeak, speak, stopSpeaking } from '../audio/speech.js';
-import { t, tr, islandName, LANGS, getLang, versionText } from '../i18n/i18n.js';
+import { t, tr, N_, islandName, LANGS, getLang, versionText } from '../i18n/i18n.js';
 import { limitLetters } from '../util/text.js';
 
 // English labels (the keys); they are translated with t() where they are shown.
@@ -66,7 +66,7 @@ export function menuPanel(g) {
         tile('⚙️', t('Settings'), () => g.openPanel('settings')),
         tile('❓', t('How to Play'), () => g.openPanel('help')),
         tile('📸', t('Photo'), () => { g.ui.closeSheet(); g.takePhoto(); }),
-        tile('🚪', t('Leave Island'), () => g.openPanel('leave')),
+        tile('🏠', t('Start Screen'), () => g.openPanel('leave')),
       ));
     },
   });
@@ -358,6 +358,15 @@ export function letterPanel(g, letter) {
 }
 
 // ---------------------------------------------------------------- family & invite
+// what the status line on the family page says (see Session.netState)
+const NET_LINE = {
+  online: N_('🟢 Ready: family members can join'),
+  together: N_('🟢 Playing together'),
+  finding: N_('🟡 Finding your family…'),
+  offline: N_('🟡 Connecting to the internet… (you can still play)'),
+  update: N_('📲 A family member’s phone has a different version. Update both phones to play together.'),
+  alone: N_('🏝️ Playing on this phone. Everything joins up with the family later.'),
+};
 export function familyPanel(g) {
   let renaming = false; // typing a new island name (the page is not redrawn meanwhile)
   g.ui.openSheet({
@@ -367,15 +376,16 @@ export function familyPanel(g) {
       const code = S.code || '';
       const pretty = prettyCode(code);
       const sc = splitCode(code);
-      b.append(h('div', { class: 'code-box' }, h('div', { class: 'island-name' }, '🏝️ ', islandName(S.state.name)), h('small', {}, S.isHost ? t('Our island code') : t('Island code')),
+      b.append(h('div', { class: 'code-box' }, h('div', { class: 'island-name' }, '🏝️ ', islandName(S.state.name)), h('small', {}, t('Our island code')),
         h('div', { class: 'code' }, sc?.pic ? h('span', { class: 'code-pic' }, sc.pic) : null, sc ? h('span', {}, sc.word, ' ', h('b', {}, sc.num)) : code)));
-      if (S.isHost && !renaming) {
+      // the island belongs to the whole family: anyone may name it
+      if (!renaming) {
         b.append(h('div', { class: 'row' }, btn(t('✏️ Name our island'), () => {
           renaming = true;
           g.ui.refreshSheet();
           focusAfterTap(b.querySelector('.rename-input'));
         }, 'small ghost')));
-      } else if (S.isHost) {
+      } else {
         // typed right here on the page (a phone pop-up box would pause the game for everyone while it is open)
         const shown = islandName(S.state.name);
         const inp = h('input', { class: 'name-input rename-input', maxlength: 80, value: shown, autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'done' });
@@ -392,22 +402,23 @@ export function familyPanel(g) {
         b.append(h('label', { class: 'field' }, h('span', {}, t('What should your island be called?')), inp));
         b.append(h('div', { class: 'row' }, btn(t('Cancel'), () => done(false), 'small ghost'), btn(t('Save'), () => done(true), 'small primary')));
       }
-      if (S.isHost) {
-        const st = S.transport?.status() || {};
-        b.append(h('p', { class: 'lead' }, t('On another phone: open Cozy Cove → '), h('b', {}, t('Join Family')), t(' → tap this picture and type its numbers. Up to 4 players can play together. Being on the same Wi-Fi works best!')));
-        b.append(h('p', { class: 'net ' + (st.peer || st.trystero ? 'ok' : '') }, st.peer ? t('🟢 Ready for family to join') : t('🟡 Connecting to the internet… (you can still play)')));
-      } else {
-        b.append(h('p', { class: 'lead' }, t('You’re visiting the family island. Everything you find goes into the shared family basket!')));
-      }
+      const net = S.netState();
+      b.append(h('p', { class: 'net ' + (net === 'online' ? 'ok' : '') }, t(NET_LINE[net === 'online' && S.online.size > 1 ? 'together' : net] || NET_LINE.finding)));
+      b.append(h('p', { class: 'lead' }, t('On another phone: open Cozy Cove → '), h('b', {}, t('Join your family')), t(' → tap this picture and type its numbers.')));
       b.append(h('div', { class: 'row' },
         btn(t('📋 Copy code'), () => { navigator.clipboard?.writeText(code).then(() => g.ui.toast(t('Code copied!'), '📋', 1200)).catch(() => {}); }, 'ghost'),
         navigator.share ? btn(t('💌 Share'), () => navigator.share({ title: 'Cozy Cove', text: t('Come play on our Cozy Cove island! Code: {code}', { code: pretty }) }).catch(() => {}), 'ghost') : null));
+      const face = (o) => h('span', { class: 'face', style: { borderColor: o.look?.accent, background: o.look?.shirt } }, firstLetter(o.name));
       b.append(h('h3', {}, t('On the island now ({n}/4)', { n: S.online.size })));
-      b.append(h('div', { class: 'list' }, [...S.online.entries()].map(([pid, o]) => h('div', { class: 'row-item' },
-        h('span', { class: 'face', style: { borderColor: o.look?.accent, background: o.look?.shirt } }, firstLetter(o.name)),
-        h('span', { class: 'grow' }, o.name, pid === S.pid ? t(' (you)') : ''),
-        pid === S.pid && S.isHost ? h('small', {}, t('host 🏠')) : null,
-        S.isHost && pid !== S.pid ? btn(t('Send home'), () => { if (confirm(t('Send {name} home? They can join again later.', { name: o.name }))) { S.kick(pid); g.ui.closeSheet(); } }, 'small ghost') : null))));
+      b.append(h('div', { class: 'list' }, [...S.online.entries()].map(([pid, o]) => h('div', { class: 'row-item' }, face(o),
+        h('span', { class: 'grow' }, o.name, pid === S.pid ? t(' (you)') : '')))));
+      // everyone else who lives here plays on their own phone whenever they like
+      const away = S.members().filter((m) => !S.online.has(m.pid));
+      if (away.length) {
+        b.append(h('h3', {}, t('Also lives here')));
+        b.append(h('div', { class: 'list' }, away.map((m) => h('div', { class: 'row-item' }, face(m), h('span', { class: 'grow' }, m.name)))));
+      }
+      b.append(h('p', { class: 'lead small' }, t('The island belongs to the whole family: every family member’s phone keeps it, so anyone can play any time. When you play at the same time, you play together (up to 4).')));
     },
   });
 }
@@ -461,11 +472,7 @@ export function settingsPanel(g) {
       b.append(h('h3', {}, t('Game')), toggle(t('🎣 Relaxed fishing (easier)'), 'relaxedFishing'), toggle(t('🏷️ Show names above heads'), 'nameTags'), toggle(t('📊 Show speed (FPS)'), 'showFps'));
       b.append(h('h3', {}, t('App')));
       b.append(h('div', { class: 'row' }, btn(t('🔄 Check for update'), () => g.checkUpdate(), 'ghost')));
-      if (g.session.isHost) {
-        b.append(btn(t('🗑️ Start a brand-new island…'), () => {
-          if (confirm(t('Start over with a brand-new island? Everything on this island will be gone.')) && confirm(t('Are you really sure? This can’t be undone.'))) g.resetIsland();
-        }, 'danger small'));
-      }
+      b.append(btn(t('🧳 Move out of this family island…'), () => moveOutPanel(g), 'danger small'));
       b.append(h('p', { class: 'about' }, t('Cozy Cove · made with love for families 💛')));
       b.append(h('p', { class: 'about small' }, t('Version: {when}', { when: versionText() })));
     },
@@ -486,7 +493,7 @@ export function helpPanel(g) {
         tip('🍳', t('Cooking'), t('Visit the campfire to turn fish, fruit and veggies into yummy dishes.')),
         tip('📋', t('Family Board'), t('Work together to fix the bridge, light the lighthouse and throw a Lantern Festival!')),
         tip('🧺', t('Shared basket'), t('Everything anyone finds goes into ONE family basket. Coins go into the family jar.')),
-        tip('👨‍👩‍👧‍👦', t('Play together'), t('One phone taps "Play on our island". Others tap "Join Family", tap the island’s picture and type its 3 numbers. Up to 4 players!')),
+        tip('👨‍👩‍👧‍👦', t('Play together'), t('The island belongs to the whole family. On a new phone, tap “Join your family”, tap the island’s picture and type its 3 numbers. After that, anyone can play any time; when you play at the same time, you play together (up to 4).')),
         tip('✉️', t('Every day'), t('Check the mailbox each morning for a gift, and dig for treasure on Turtle Islet!')),
         tip('🌐', t('Language'), t('Tap 🇹🇭 ภาษาไทย / 🇬🇧 English at the top of the menu ☰. Every phone can use its own language.')),
         tip('🔊', t('Read to me'), t('Letters and messages in bottles have a 🔊 button: the phone reads them out loud.')),
@@ -497,10 +504,22 @@ export function helpPanel(g) {
 
 export function leavePanel(g) {
   g.ui.openSheet({
-    title: () => t('Leave the island?'), icon: '🚪',
+    title: () => t('Back to the start screen?'), icon: '🏠',
     build: (b, close) => {
-      b.append(h('p', { class: 'lead' }, g.session.isHost ? t('Your island is saved on this phone. If family members are playing, they’ll be sent back to the menu.') : t('You can come back any time with the island code.')));
-      b.append(h('div', { class: 'row' }, btn(t('Stay'), close, 'ghost'), btn(t('Leave'), () => { close(); g.leave(); }, 'primary')));
+      b.append(h('p', { class: 'lead' }, t('The island stays on this phone, and your family can keep playing. Come back any time!')));
+      b.append(h('div', { class: 'row' }, btn(t('Stay'), close, 'ghost'), btn(t('🏠 Start screen'), () => { close(); g.leave(); }, 'primary')));
+    },
+  });
+}
+
+// "Move out of this family island" (Settings): a second page to be sure. Nothing is thrown away.
+function moveOutPanel(g) {
+  g.ui.openSheet({
+    title: () => t('Move out of this island?'), icon: '🧳',
+    build: (b, close) => {
+      b.append(h('p', { class: 'lead' }, t('You’ll go back to the start screen, where you can join another family or start a new island.')));
+      b.append(h('p', { class: 'lead' }, t('This island stays safe on this phone: you can go back to it any time (“↩️ Back to …” on the start screen), and your family keeps playing on it.')));
+      b.append(h('div', { class: 'row' }, btn(t('Stay'), close, 'ghost'), btn(t('🧳 Move out'), () => { close(); g.moveOut(); }, 'danger')));
     },
   });
 }

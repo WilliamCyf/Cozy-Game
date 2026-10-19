@@ -3,8 +3,8 @@
 //   ['set', path, value]     e.g. ['set', ['plots', 3, 'water'], true]
 //   ['inc', path, n, prune]  e.g. ['inc', ['basket', 'shell'], 1]
 //   ['push', path, value, max]
-// The host makes the ops; every phone applies the same ops in the same order,
-// so all copies of the ledger stay identical.
+// The leading phone makes the ops; every phone there applies the same ops in the same order,
+// so all copies of the ledger stay identical (and village.js merges copies that were played apart).
 import { START_STATE, PROJECTS } from './data.js';
 import { shortText } from '../util/text.js';
 
@@ -116,12 +116,18 @@ export function applyOps(state, ops) {
   }
 }
 
-export function saveIsland(state) {
+// backup: 'rotate' = the save so far becomes the safety copy (once per game, not every save: half the
+// writing); 'both' = the safety copy is this island too (a copy just taken over from the family, so a
+// broken save can never bring back the island this phone had before).
+export function saveIsland(state, backup = null) {
   try {
     const json = JSON.stringify(state);
-    const prev = localStorage.getItem(SAVE_KEY);
-    if (prev) localStorage.setItem(SAVE_KEY + '.bak', prev);
+    if (backup === 'rotate') {
+      const prev = localStorage.getItem(SAVE_KEY);
+      if (prev) localStorage.setItem(SAVE_KEY + '.bak', prev);
+    }
     localStorage.setItem(SAVE_KEY, json);
+    if (backup === 'both') localStorage.setItem(SAVE_KEY + '.bak', json);
     return true;
   } catch (e) {
     console.warn('save failed', e);
