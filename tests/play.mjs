@@ -29,7 +29,7 @@ try {
     await p.goto(base + '?nosw&lang=en');
     await wait(6000);
     await shot(p, 'title');
-    await p.getByText('Play on our island').click();
+    await p.getByText('Join your family').click();
     await wait(1500);
     await shot(p, 'profile');
   } else if (scenario === 'host') {
@@ -178,7 +178,7 @@ try {
     const t = await newPhone('T');
     await t.goto(base + '?nosw&nopeer&notry&lang=en');
     await wait(5000);
-    await t.getByText('Play on our island').click();
+    await t.getByText('Join your family').click();
     await wait(2500);
     await shot(t, 'v-profile');
     const p = await newPhone('A');

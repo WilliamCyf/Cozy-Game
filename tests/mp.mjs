@@ -1,4 +1,5 @@
-// Multiplayer test: 1 host + 3 guests (+1 extra who should be turned away), all on this computer.
+// Multiplayer test: 4 family members on one island (+1 extra, who plays on their own copy for now), all on
+// this computer. The first phone leads; when it leaves, another phone takes over by itself.
 //   node tests/mp.mjs [peer|try|both] [outdir]
 import { chromium } from 'playwright';
 import { startServers } from './servers.mjs';
@@ -79,12 +80,16 @@ try {
   const ledgers = await Promise.all([host, ...guests].map((ph) => ph.p.evaluate(() => { const s = window.__game.session.state; return JSON.stringify([s.coins, s.basket, Object.keys(s.items).sort(), s.journal, s.projects]); })));
   check(ledgers.every((l) => l === ledgers[0]), 'all four ledgers are identical');
 
-  // a 5th player is turned away politely
+  // a 5th family member: the island is full (4 at once), so Gran gets the family's island on her phone and
+  // plays on her own copy for now (it joins up later)
   const extra = await phone('Gran');
   await extra.p.goto(base + `&join=${code}&name=Gran`);
   await extra.p.waitForFunction(() => document.querySelector('.error') || window.__game, null, { timeout: 45000 }).catch(() => {});
-  const extraState = await extra.p.evaluate(() => ({ joined: !!window.__game, text: document.querySelector('.error')?.textContent || '' }));
-  check(!extraState.joined && /full/i.test(extraState.text), `5th player told the island is full ("${extraState.text}")`);
+  await wait(1500);
+  const extraState = await extra.p.evaluate(() => ({ game: !!window.__game, phase: window.__game?.session?.phase, coins: window.__game?.session?.state?.coins, toasts: [...document.querySelectorAll('.toast')].map((x) => x.textContent).join(' | ') }));
+  const hostCoins = await host.p.evaluate(() => window.__game.session.state.coins);
+  check(extraState.game && extraState.phase !== 'visiting' && extraState.coins === hostCoins && /4 family members/.test(extraState.toasts), `5th player plays on her own copy of the family island for now (${JSON.stringify(extraState)})`);
+  check(await host.p.evaluate(() => window.__game.session.online.size) === 4, 'the island still has 4 playing together');
   await extra.ctx.close();
 
   // a guest leaves -> others see them go
@@ -95,11 +100,19 @@ try {
 
   for (const ph of [host, ...guests.slice(0, 2)]) await ph.p.screenshot({ path: `${out}/${mode}-${ph.name}.png` });
 
-  // the host closes the island -> guests get a friendly message
+  // the first phone goes back to its start screen -> the others just keep playing: one of them leads now
   await host.p.evaluate(() => window.__game.leave());
-  await wait(3500);
-  const msg = await guests[0].p.evaluate(() => document.querySelector('.overlay:not(.hidden)')?.textContent || '');
-  check(/closed/i.test(msg), `guests told the host closed the island ("${msg.slice(0, 60)}")`);
+  let leaders = 0, together = 0;
+  for (let i = 0; i < 40; i++) {
+    await wait(500);
+    const st = await Promise.all(guests.slice(0, 2).map((g) => g.p.evaluate(() => [window.__game.session.phase, window.__game.session.online.size])));
+    leaders = st.filter((x) => x[0] === 'leading').length;
+    together = Math.max(...st.map((x) => x[1]));
+    if (leaders === 1 && together === 2) break;
+  }
+  const overlays = await Promise.all(guests.slice(0, 2).map((g) => g.p.evaluate(() => document.querySelector('.overlay:not(.hidden)')?.textContent || '')));
+  check(leaders === 1 && together === 2, `after the first phone left, one phone leads and both play together (${leaders} leading, ${together} together)`);
+  check(overlays.every((x) => !x), 'nobody sees a "lost connection" screen');
 } catch (e) {
   ok = false;
   console.log('FAIL exception', e.message);
@@ -108,4 +121,4 @@ console.log(errors.length ? 'ERRORS:\n' + errors.slice(0, 20).join('\n') : 'no p
 console.log(ok ? 'ALL PASSED' : 'SOME FAILED');
 await browser.close();
 servers.close();
-process.exit(0);
+process.exit(ok && !errors.length ? 0 : 1);

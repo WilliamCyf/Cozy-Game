@@ -18,7 +18,7 @@ export default {
   'Settings': 'ตั้งค่า',
   'How to Play': 'วิธีเล่น',
   'Photo': 'ถ่ายรูป',
-  'Leave Island': 'ออกจากเกาะ',
+  'Start Screen': 'หน้าแรก',
 
   // ---- basket
   'Family Basket': 'ตะกร้าครอบครัว',
@@ -131,24 +131,26 @@ export default {
 
   // ---- family & invite
   'Our island code': 'รหัสเกาะของเรา',
-  'Island code': 'รหัสเกาะ',
   '✏️ Name our island': '✏️ ตั้งชื่อเกาะ',
   'What should your island be called?': 'จะตั้งชื่อเกาะว่าอะไรดี?',
   'On another phone: open Cozy Cove → ': 'บนมือถืออีกเครื่อง: เปิดเกมนี้ → ',
-  'Join Family': 'เข้าร่วมครอบครัว',
-  ' → tap this picture and type its numbers. Up to 4 players can play together. Being on the same Wi-Fi works best!': ' → แตะรูปนี้ แล้วพิมพ์ตัวเลขข้างๆ เล่นด้วยกันได้สูงสุด 4 คน ใช้ไวไฟเดียวกันจะดีที่สุดนะ!',
-  '🟢 Ready for family to join': '🟢 พร้อมให้ครอบครัวมาเล่นแล้ว',
+  'Join your family': 'เข้าร่วมครอบครัว',
+  ' → tap this picture and type its numbers.': ' → แตะรูปนี้ แล้วพิมพ์ตัวเลขข้างๆ',
+  // the status line (NET_LINE in panels.js)
+  '🟢 Ready: family members can join': '🟢 พร้อมแล้ว: คนในครอบครัวเข้ามาเล่นได้เลย',
+  '🟢 Playing together': '🟢 กำลังเล่นด้วยกัน',
+  '🟡 Finding your family…': '🟡 กำลังตามหาครอบครัว…',
   '🟡 Connecting to the internet… (you can still play)': '🟡 กำลังต่ออินเทอร์เน็ต… (เล่นไปก่อนได้เลย)',
-  'You’re visiting the family island. Everything you find goes into the shared family basket!': 'ตอนนี้เรามาเที่ยวเกาะของครอบครัว ทุกอย่างที่เจอจะเข้าตะกร้าครอบครัวที่ใช้ร่วมกันนะ!',
+  '📲 A family member’s phone has a different version. Update both phones to play together.': '📲 มือถือของคนในครอบครัวใช้เกมคนละเวอร์ชัน อัปเดตทั้งสองเครื่องก่อน จะได้เล่นด้วยกันนะ',
+  '🏝️ Playing on this phone. Everything joins up with the family later.': '🏝️ กำลังเล่นในมือถือเครื่องนี้ เดี๋ยวทุกอย่างจะไปรวมกับของครอบครัวทีหลังเอง',
   '📋 Copy code': '📋 คัดลอกรหัส',
   'Code copied!': 'คัดลอกรหัสแล้ว!',
   '💌 Share': '💌 แชร์',
   'Come play on our Cozy Cove island! Code: {code}': 'มาเล่นเกม Cozy Cove ที่เกาะของเรากันเถอะ! รหัสเกาะ: {code}',
   'On the island now ({n}/4)': 'ตอนนี้อยู่บนเกาะ ({n}/4)',
   ' (you)': ' (ฉัน)',
-  'host 🏠': 'เจ้าของเกาะ 🏠',
-  'Send home': 'ส่งกลับบ้าน',
-  'Send {name} home? They can join again later.': 'ส่ง {name} กลับบ้านไหม? เดี๋ยวกลับมาเล่นใหม่ได้นะ',
+  'Also lives here': 'อาศัยอยู่บนเกาะนี้ด้วย',
+  'The island belongs to the whole family: every family member’s phone keeps it, so anyone can play any time. When you play at the same time, you play together (up to 4).': 'เกาะนี้เป็นของทั้งครอบครัว ทุกคนมีเกาะนี้อยู่ในมือถือของตัวเอง ใครจะเล่นตอนไหนก็ได้ ถ้าเปิดเกมพร้อมกันก็จะได้เล่นด้วยกันเลย (สูงสุด 4 คน)',
 
   // ---- settings
   'Language': 'ภาษา',
@@ -165,9 +167,7 @@ export default {
   '📊 Show speed (FPS)': '📊 แสดงความเร็วเกม',
   'App': 'แอป',
   '🔄 Check for update': '🔄 เช็กอัปเดต',
-  '🗑️ Start a brand-new island…': '🗑️ เริ่มเกาะใหม่…',
-  'Start over with a brand-new island? Everything on this island will be gone.': 'เริ่มเกาะใหม่ตั้งแต่ต้นเลยไหม? ทุกอย่างบนเกาะนี้จะหายไปหมดนะ',
-  'Are you really sure? This can’t be undone.': 'แน่ใจจริงๆ ใช่ไหม? ทำแล้วย้อนกลับไม่ได้นะ',
+  '🧳 Move out of this family island…': '🧳 ย้ายออกจากเกาะนี้…',
   'Cozy Cove · made with love for families 💛': 'Cozy Cove · ทำด้วยความรักเพื่อทุกครอบครัว 💛',
 
   // ---- how to play
@@ -185,14 +185,19 @@ export default {
   'Shared basket': 'ตะกร้าใช้ร่วมกัน',
   'Everything anyone finds goes into ONE family basket. Coins go into the family jar.': 'ใครเจออะไร ทุกอย่างจะเข้าตะกร้าครอบครัว "ใบเดียวกัน" ส่วนเหรียญจะเข้ากระปุกครอบครัว',
   'Play together': 'เล่นด้วยกัน',
-  'One phone taps "Play on our island". Others tap "Join Family", tap the island’s picture and type its 3 numbers. Up to 4 players!': 'มือถือเครื่องหนึ่งแตะ "เล่นบนเกาะของเรา" เครื่องอื่นแตะ "เข้าร่วมครอบครัว" แตะรูปของเกาะ แล้วพิมพ์ตัวเลข 3 ตัว เล่นได้สูงสุด 4 คน!',
+  'The island belongs to the whole family. On a new phone, tap “Join your family”, tap the island’s picture and type its 3 numbers. After that, anyone can play any time; when you play at the same time, you play together (up to 4).': 'เกาะนี้เป็นของทั้งครอบครัว บนมือถือเครื่องใหม่ ให้แตะ “เข้าร่วมครอบครัว” แตะรูปของเกาะ แล้วพิมพ์ตัวเลข 3 ตัว หลังจากนั้นใครจะเล่นตอนไหนก็ได้ ถ้าเปิดเกมพร้อมกันก็จะได้เล่นด้วยกันเลย (สูงสุด 4 คน)',
   'Every day': 'ทุกวัน',
   'Check the mailbox each morning for a gift, and dig for treasure on Turtle Islet!': 'ทุกเช้าไปเปิดตู้จดหมายรับของขวัญ แล้วไปขุดหาสมบัติที่เกาะเต่าน้อยด้วยนะ!',
 
-  // ---- leave
-  'Leave the island?': 'ออกจากเกาะไหม?',
-  'Your island is saved on this phone. If family members are playing, they’ll be sent back to the menu.': 'เกาะของเราบันทึกไว้ในมือถือเครื่องนี้แล้ว ถ้ามีคนในครอบครัวเล่นอยู่ด้วย ทุกคนจะถูกส่งกลับไปหน้าเมนูนะ',
-  'You can come back any time with the island code.': 'กลับมาเล่นได้ทุกเมื่อด้วยรหัสเกาะนะ',
+  // ---- back to the start screen (the island stays on this phone)
+  'Back to the start screen?': 'กลับไปหน้าแรกไหม?',
+  'The island stays on this phone, and your family can keep playing. Come back any time!': 'เกาะยังอยู่ในมือถือเครื่องนี้ และคนในครอบครัวก็เล่นต่อได้นะ กลับมาได้ทุกเมื่อเลย!',
   'Stay': 'อยู่ต่อ',
-  'Leave': 'ออก',
+  '🏠 Start screen': '🏠 หน้าแรก',
+
+  // ---- move out of this family island (Settings; nothing is thrown away)
+  'Move out of this island?': 'ย้ายออกจากเกาะนี้ไหม?',
+  'You’ll go back to the start screen, where you can join another family or start a new island.': 'จะกลับไปที่หน้าแรกนะ จากนั้นจะเข้าร่วมครอบครัวอื่นหรือเริ่มเกาะใหม่ก็ได้',
+  'This island stays safe on this phone: you can go back to it any time (“↩️ Back to …” on the start screen), and your family keeps playing on it.': 'เกาะนี้ยังอยู่ในมือถือเครื่องนี้ ไม่หายไปไหน กลับมาได้ทุกเมื่อ (แตะ “↩️ กลับไปที่ …” ที่หน้าแรก) และคนในครอบครัวก็ยังเล่นบนเกาะนี้ต่อได้นะ',
+  '🧳 Move out': '🧳 ย้ายออก',
 };

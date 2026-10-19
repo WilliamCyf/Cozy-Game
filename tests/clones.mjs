@@ -4,6 +4,7 @@
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { startServers } from './servers.mjs';
+import { startNewIsland } from './helpers.mjs';
 
 const out = process.argv[2] || '/tmp/clones';
 mkdirSync(out, { recursive: true });
@@ -41,14 +42,14 @@ async function intoGame(p) {
 }
 
 try {
-  // 1. brand-new phone: choose language -> Play -> make your islander -> new island
+  // 1. brand-new phone: choose language -> Start a new family island -> make your islander -> Start
   const a = await phone('new');
   await a.goto(base);
   await a.waitForSelector('.lang-screen', { timeout: 90000 });
   await a.tap('.lang-pick .btn.primary');
   await a.waitForSelector('.screen.title');
   await wait(600);
-  await a.tap('.title-buttons .btn.primary');
+  await a.tap('.title-buttons .btn.ghost');
   await a.waitForSelector('.name-input');
   await wait(800);
   // play with the look a bit (the preview on the deck changes)
@@ -56,6 +57,8 @@ try {
   await wait(300);
   await a.fill('.name-input', 'Mum');
   await a.tap('.look-editor .btn.primary');
+  await a.waitForSelector('.screen.join.in .col-buttons .btn.primary');
+  await a.tap('.screen.join.in .col-buttons .btn.primary'); // "🌱 Start a new island"
   await intoGame(a);
   let n = await people(a);
   check(n === 1, `brand-new player, new island: ${n} character(s) on the island`);
@@ -67,14 +70,20 @@ try {
   check(n === 1, `after walking: still ${n} character(s)`);
   await a.screenshot({ path: `${out}/1-walked.png` });
 
-  // 2. "Start a brand-new island" from Settings (the island is wiped, the game reloads)
-  //    The old island is marked first (day 9, 777 coins): it must NOT come back.
+  // 2. "Move out of this family island" (Settings), then start a brand-new island. The old island is
+  //    marked first (day 9, 777 coins): it is not on the new island, but it is kept ("Back to …").
   await a.evaluate(() => { const s = window.__game.session; s.state.day = 9; s.state.coins = 777; s.save(); });
-  await a.evaluate(() => { window.__oldGame = true; window.__game.resetIsland(); });
-  await a.waitForFunction(() => !window.__oldGame && window.__game?.session?.state, null, { timeout: 90000 });
+  await a.evaluate(() => { window.__oldGame = true; window.__game.openPanel('settings'); });
+  await wait(700);
+  await a.getByRole('button', { name: /Move out of this family island/ }).tap();
+  await wait(600);
+  await a.getByRole('button', { name: /^🧳 Move out$/ }).tap();
+  await a.waitForSelector('.screen.title.in', { timeout: 90000 });
+  check(!!(await a.$('.screen.title.in .btn.ghost.small')), 'after moving out: the start screen offers "↩️ Back to …"');
+  await startNewIsland(a);
   await wait(2500);
   n = await people(a);
-  check(n === 1, `after "Start a brand-new island": ${n} character(s)`);
+  check(n === 1, `after moving out and starting a new island: ${n} character(s)`);
   const fresh = await a.evaluate(() => { const s = window.__game.session.state; return { day: s.day, coins: s.coins }; });
   check(fresh.day === 1 && fresh.coins !== 777, `the new island really is new (day ${fresh.day}, ${fresh.coins} coins)`);
 
@@ -133,21 +142,25 @@ try {
   check(n === 1 && await games(a) === 1, `triple tap on "Play": ${n} character(s), ${await games(a)} game(s) running`);
   await a.screenshot({ path: `${out}/6-triple-tap.png` });
 
-  // 7. impatient double tap on "Let's go!" when making a brand-new islander
+  // 7. impatient triple taps on "Let's go!" when making a brand-new islander, then on "Start a new island"
   const b = await phone('new2');
   await b.goto(base + '&lang=en');
   await b.waitForSelector('.screen.title', { timeout: 90000 });
   await wait(600);
-  await b.tap('.title-buttons .btn.primary');
+  await b.tap('.title-buttons .btn.ghost');
   await b.waitForSelector('.name-input');
   await wait(800);
   await b.fill('.name-input', 'Leo');
   const go = await b.$eval('.look-editor .btn.primary', (e) => { e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
   for (let i = 0; i < 3; i++) { await b.touchscreen.tap(go.x, go.y); await wait(60); }
+  await b.waitForSelector('.screen.join.in .col-buttons .btn.primary');
+  await wait(400);
+  const start = await b.$eval('.screen.join.in .col-buttons .btn.primary', (e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  for (let i = 0; i < 3; i++) { await b.touchscreen.tap(start.x, start.y); await wait(60); }
   await intoGame(b);
   await wait(1500);
   n = await people(b);
-  check(n === 1 && await games(b) === 1, `triple tap on "Let's go!": ${n} character(s), ${await games(b)} game(s) running`);
+  check(n === 1 && await games(b) === 1, `triple taps on "Let's go!" and "Start": ${n} character(s), ${await games(b)} game(s) running`);
 
   // 8. Join -> Cancel -> Join again (real matchmakers on this computer, so the join takes a moment):
   //    the cancelled try must not start a second game later, and Dad must see the kid only once
@@ -167,7 +180,7 @@ try {
   const word = code.replace(/\d+$/, ''), digits = code.slice(word.length);
   for (let round = 0; round < 2; round++) {
     await c.evaluate((slow) => { window.__slowJoin = slow; }, round === 0 ? 4000 : 0); // the first try is slow, like a phone on bad Wi-Fi
-    await c.tap('.screen.title.in .title-buttons .btn.big:not(.primary)');
+    await c.tap('.screen.title.in .title-buttons .btn.primary'); // "🤝 Join your family" (no island on this phone yet)
     await c.waitForSelector('.screen.join.in .pic-grid .pic');
     await c.tap(`.screen.join.in .pic[aria-label="${word}"]`);
     await c.focus('.screen.join.in .num-input');
@@ -179,7 +192,7 @@ try {
       await wait(200);
     }
   }
-  await c.waitForFunction(() => window.__game?.session?.connected, null, { timeout: 60000 });
+  await c.waitForFunction(() => window.__game?.session?.phase === 'visiting', null, { timeout: 60000 });
   await wait(5000);
   const kidGames = await games(c), kidPeople = await people(c);
   const dadSees = await host.evaluate(() => [...window.__game.session.online.values()].map((o) => o.name));

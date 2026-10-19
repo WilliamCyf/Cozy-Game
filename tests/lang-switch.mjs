@@ -70,12 +70,17 @@ try {
   check(bad.length === 0, `title screen is all Thai now ${bad.length ? JSON.stringify(bad) : ''}`);
   check(/เวอร์ชัน/.test(await a.$eval('.title-foot .ver', (e) => e.textContent)), 'the title screen shows the version (in Thai)');
   await a.screenshot({ path: `${out}/1-title-th.png` });
-  await a.tap('.title-buttons .btn.primary');
+  await a.tap('.title-buttons .btn.ghost'); // "🌱 Start a new family island"
   await wait(1200);
   bad = await wrongWords(a, 'th');
   check(bad.length === 0, `"make your islander" screen is Thai ${bad.length ? JSON.stringify(bad) : ''}`);
   await a.fill('.name-input', 'Nok');
   await a.tap('.look-editor .btn.primary');
+  await a.waitForSelector('.screen.join.in .col-buttons .btn.primary');
+  await wait(700);
+  bad = await wrongWords(a, 'th');
+  check(bad.length === 0, `"start a new family island?" card is Thai ${bad.length ? JSON.stringify(bad) : ''}`);
+  await a.tap('.screen.join.in .col-buttons .btn.primary');
   await a.waitForFunction(() => window.__game?.session?.state, null, { timeout: 90000 });
   await wait(2500);
   bad = await wrongWords(a, 'th');

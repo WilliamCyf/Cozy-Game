@@ -96,11 +96,15 @@ try {
   await p.waitForSelector('.screen.title', { timeout: 30000 });
   await wait(1500);
   await inspect(p, '01-title');
-  await p.tap('.title-buttons .btn.primary');
+  await p.tap('.title-buttons .btn.ghost'); // "🌱 Start a new family island"
   await wait(1200);
   await inspect(p, '02-profile');
   await p.fill('.name-input', 'แม่');
   await p.tap('.look-editor .btn.primary');
+  await p.waitForSelector('.screen.join.in .col-buttons .btn.primary');
+  await wait(700);
+  await inspect(p, '02b-start-new-card');
+  await p.tap('.screen.join.in .col-buttons .btn.primary');
   await p.waitForFunction(() => window.__game?.session?.state, null, { timeout: 90000 });
   await wait(2500);
   await recordMessages(p);
@@ -205,7 +209,8 @@ try {
   await j.reload();
   await j.waitForSelector('.screen.title', { timeout: 90000 });
   await wait(1200);
-  await j.tap('.title-buttons .btn.big:not(.primary)');
+  await inspect(j, '59-title-no-island');
+  await j.tap('.title-buttons .btn.primary'); // "🤝 Join your family"
   await wait(1200);
   await inspect(j, '60-join');
   await j.fill('.code-input', 'CRAB123').catch(() => {});

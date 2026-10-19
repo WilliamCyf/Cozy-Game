@@ -12,7 +12,6 @@ export default {
   '{name} went home for now.': '{name} กลับบ้านไปก่อนแล้ว',
   'Another island was using our code, so we got a new one: {code}': 'มีเกาะอื่นใช้รหัสเดียวกันอยู่ เราเลยได้รหัสเกาะใหม่: {code}',
   'Welcome home, {name}! Day {day} on {island}.': 'ยินดีต้อนรับกลับบ้านนะ {name}! วันที่ {day} ที่ {island}',
-  'Welcome to the family island, {name}!': 'ยินดีต้อนรับสู่เกาะของครอบครัวนะ {name}!',
   'There’s a letter in the mailbox by the cottage!': 'มีจดหมายอยู่ในตู้จดหมายข้างบ้านแน่ะ!',
   'Friend': 'เพื่อน',
 
@@ -34,11 +33,11 @@ export default {
   '🌱 Plant seeds in the garden by the cottage': '🌱 ไปปลูกเมล็ดในแปลงผักข้างบ้านกันเถอะ',
 
   // ---- connection troubles
-  'Back to menu': 'กลับไปเมนู',
-  'Lost the connection to the island…': 'การเชื่อมต่อกับเกาะหลุดไป…',
-  'Reconnecting. (Is the host’s phone awake?)': 'กำลังเชื่อมต่อใหม่ (มือถือของเจ้าของเกาะยังเปิดอยู่ไหมนะ?)',
-  'Back on the island!': 'กลับมาที่เกาะแล้ว!',
-  'Couldn’t reach the island. Ask the host to open Cozy Cove, then try again.': 'ติดต่อเกาะไม่ได้ ลองบอกเจ้าของเกาะให้เปิดเกมไว้ แล้วลองใหม่อีกครั้งนะ',
+  'Back to menu': 'กลับไปหน้าแรก',
+  // can't meet the family right now (the game goes on, on this phone's copy of the island)
+  'A family member’s phone has a different version of Cozy Cove. Update both phones to play together.': 'มือถือของคนในครอบครัวใช้เกมคนละเวอร์ชันกับเครื่องนี้ อัปเดตทั้งสองเครื่องก่อน จะได้เล่นด้วยกันนะ',
+  'Another island is using our code right now, so the family can’t meet here for a while.': 'ตอนนี้มีเกาะอื่นใช้รหัสเดียวกับเราอยู่ คนในครอบครัวเลยยังเล่นด้วยกันไม่ได้ รอสักพักนะ',
+  '4 family members are playing already. You’re playing on this phone for now; everything joins up later.': 'มีคนในครอบครัวเล่นอยู่ครบ 4 คนแล้ว เล่นในเครื่องนี้ไปก่อนนะ เดี๋ยวทุกอย่างจะไปรวมกับของครอบครัวทีหลังเอง',
 
   // ---- updates
   'Checking for updates…': 'กำลังตรวจหาอัปเดต…',

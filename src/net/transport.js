@@ -9,7 +9,8 @@
 import { Peer } from 'peerjs';
 import { joinRoom } from 'trystero';
 
-const APP_ID = 'cozy-cove-family-island-v1';
+// (v5: family islands. Older versions use another name on the relay road, so the two never mix there.)
+const APP_ID = 'cozy-cove-family-island-v5';
 const PEER_PREFIX = 'cozycove-v1-';
 const ICE = [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -28,8 +29,10 @@ function peerOptions() {
   }
   return o;
 }
+// (No relay password: the room's name already has the island code in it, and the relay's own password
+// check gets out of step after a phone was frozen, see introduce() below.)
 function trysteroConfig(code) {
-  const c = { appId: APP_ID, password: 'cove-' + code, rtcConfig: { iceServers: ICE } };
+  const c = { appId: APP_ID, rtcConfig: { iceServers: ICE } };
   const relay = params.get('relay');
   if (relay) c.relayConfig = { urls: relay.split(',') };
   return c;
@@ -54,6 +57,23 @@ const HANGUP = '\u0000hangup';
 // away can stall the handshake for ~25 s.
 const HANGUP_WAIT = 1500; // (measured: joining at once stalled 3 times in 8; after 1.5 s, 0 times in 20)
 const useTry = !params.has('notry');
+
+// The relay road's handshake: two phones say who they are. A note from an earlier try between the same
+// two phones can still be on its way (one of them was frozen for a while, say), and reading it as the
+// answer would put every later handshake between them out of step. So each note carries a fresh
+// number, and we only finish once the other phone has echoed OUR number back: by then its newest note
+// has arrived too (notes arrive in order), and that one is the answer.
+async function introduce(send, receive, info) {
+  const n = Math.random().toString(36).slice(2, 10);
+  await send({ ...info, n });
+  let theirs = null;
+  for (let i = 0; i < 16; i++) {
+    const { data } = await receive();
+    if (data?.ack === n) { if (theirs) return theirs; continue; }
+    if (data && typeof data.n === 'string' && data.role) { theirs = data; await send({ ack: data.n }); }
+  }
+  throw new Error('no clear answer');
+}
 
 // A Link = one open conversation with one other phone.
 // Big messages are cut into pieces (chunks) and glued back together on arrival.
@@ -214,16 +234,13 @@ export class HostTransport {
       // other (see session.js). Nobody is turned away at the handshake itself, though: the relay road
       // keeps a connection it saw turned away half-open for minutes, and the same two phones could then
       // not reach each other later, when one of them leads. So the connection is simply not used.
-      // (c: a huge "created" time, so a phone with the older version never thinks its island is the
-      // newer one and changes its code because of us.)
       const roles = new Map();
       const room = joinRoom(trysteroConfig(this.code), 'island-' + this.code.toLowerCase(), {
         onPeerHandshake: async (peerId, send, receive) => {
           const mine = this.meetInfo();
-          await send({ role: 'host', c: 9e15, m: mine });
-          const { data } = await receive();
-          roles.set(peerId, data?.role);
-          if (data?.role === 'host') this.onHostMeet?.(data.m || null, mine);
+          const data = await introduce(send, receive, { role: 'host', m: mine });
+          roles.set(peerId, data.role);
+          if (data.role === 'host') this.onHostMeet?.(data.m || null, mine);
         },
         onJoinError: (d) => dbg('host: handshake refused', d?.error),
       });
@@ -343,9 +360,8 @@ export function joinHost(code, timeoutMs = 20000, signal = null, { roads = 'both
         let link = null, hostId = null;
         const room = joinRoom(trysteroConfig(code), 'island-' + code.toLowerCase(), {
           onPeerHandshake: async (peerId, send, receive) => {
-            await send({ role: 'guest' });
-            const { data } = await receive();
-            if (data?.role === 'host') hosts.add(peerId); // (another visitor: not talked to, see above)
+            const data = await introduce(send, receive, { role: 'guest' });
+            if (data.role === 'host') hosts.add(peerId); // (another visitor: not talked to, see above)
           },
           onJoinError: (d) => dbg('guest: handshake refused', d?.error),
         });

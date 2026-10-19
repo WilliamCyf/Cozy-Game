@@ -102,7 +102,9 @@ export class Game {
         window.__checkForUpdate?.(true); // (maybe this phone is the old one: fetch the new version)
       } else if (why === 'other') this.ui.toast(t('Another island is using our code right now, so the family can’t meet here for a while.'), '🔑', 7000);
     });
-    session.on('full', () => this.ui.toast(t('4 family members are playing already. You’re playing on this phone for now; everything joins up later.'), '🏝️', 6000));
+    const full = () => this.ui.toast(t('4 family members are playing already. You’re playing on this phone for now; everything joins up later.'), '🏝️', 6000);
+    session.on('full', full);
+    if (session.fullWait) setTimeout(full, 1500); // (it was full when this phone joined, before this game existed)
     // The island opened in a second window (another Safari tab)? Then this window stops saving at once,
     // so the two windows never overwrite each other's progress.
     addEventListener('storage', (e) => {

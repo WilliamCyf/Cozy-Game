@@ -181,12 +181,19 @@ export class Session extends Emitter {
   static async peek(code, signal) {
     const link = await joinHost(code, 22000, signal);
     return new Promise((resolve, reject) => {
-      const t = setTimeout(() => { link.close(); reject(Object.assign(new Error('no answer'), { why: 'noanswer' })); }, 8000);
+      // (the reason is given first: hanging up afterwards would otherwise report "closed" instead)
+      const t = setTimeout(() => { reject(Object.assign(new Error('no answer'), { why: 'noanswer' })); link.close(); }, 9000);
+      // A phone with an older version doesn't know this question and stays silent. A hello with no
+      // version makes ANY phone answer "different versions" (and never lets this phone in), so the
+      // right message can be shown. (A phone with this version answers the question at once.)
+      const probe = setTimeout(() => { dbg('peek: no answer yet, asking for the version'); link.send({ k: 'hello', v: 0 }); }, 4500);
+      dbg('peek: connected', link.kind);
       link.onMessage((m) => {
-        if (m.k === 'peekr') { clearTimeout(t); resolve({ ...m, link }); }
-        else if (m.k === 'kick') { clearTimeout(t); link.close(); reject(Object.assign(new Error(m.why), { kick: m, why: m.why })); }
+        dbg('peek: got', m.k, m.why || '');
+        if (m.k === 'peekr') { clearTimeout(t); clearTimeout(probe); resolve({ ...m, link }); }
+        else if (m.k === 'kick') { clearTimeout(t); clearTimeout(probe); reject(Object.assign(new Error(m.why), { kick: m, why: m.why })); link.close(); }
       });
-      link.onClose(() => { clearTimeout(t); reject(Object.assign(new Error('closed'), { why: 'closed' })); });
+      link.onClose(() => { clearTimeout(t); clearTimeout(probe); reject(Object.assign(new Error('closed'), { why: 'closed' })); });
       link.send({ k: 'peek', v: PROTOCOL });
     });
   }

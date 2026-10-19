@@ -261,6 +261,8 @@ function cancelStart() {
 }
 // what went wrong while joining, in this phone's language
 function joinError(e) {
+  // (different versions: always our own words; an older phone's sentence still talks about a "host")
+  if (e?.kick?.why === 'version') return t('A family member’s phone has a different version of Cozy Cove. Update both phones to play together.');
   if (e?.kick?.msg) return tr(e.kick.msg); // (a "no" from the leading phone: English, or a message object)
   if (e?.why === 'noanswer') return t('That phone didn’t answer. Make sure both phones have the newest version of Cozy Cove.');
   if (e?.why === 'nospace') return t('This phone is out of space, so the island couldn’t be saved. Free up some space on the iPhone.');

@@ -44,7 +44,7 @@ try {
   await mum.reload();
   await mum.waitForSelector('.screen.title', { timeout: 60000 });
   await wait(1200);
-  await mum.tap('.title-buttons .btn.big:not(.primary)');
+  await mum.tap('.title-buttons .btn.primary'); // "🤝 Join your family" (no island on this phone yet)
   await mum.waitForSelector('.pic-grid .pic');
   await wait(500);
   const word = code.replace(/\d+$/, ''), digits = code.slice(word.length);
@@ -93,7 +93,7 @@ try {
   await kid.reload();
   await kid.waitForSelector('.screen.title', { timeout: 60000 });
   await wait(1000);
-  await kid.tap('.title-buttons .btn.big:not(.primary)');
+  await kid.tap('.title-buttons .btn.primary');
   await kid.waitForSelector('.pic-grid .pic');
   await kid.tap(`.pic[aria-label="${word}"]`);
   await kid.focus('.num-input');

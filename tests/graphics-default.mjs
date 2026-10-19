@@ -3,6 +3,7 @@
 // keep up) really switches on in a browser that can't draw 60 pictures a second, with a note in Settings.
 //   node tests/graphics-default.mjs [outdir]        (needs `npm run serve` running)
 import { chromium } from 'playwright';
+import { startNewIsland } from './helpers.mjs';
 import { mkdirSync } from 'node:fs';
 
 const out = process.argv[2] || '/tmp/graphics-default';
@@ -24,18 +25,14 @@ const graphics = (p) => p.evaluate(() => ({ quality: window.__game.settings.qual
 const chosen = (p) => p.evaluate(() => { window.__game.openPanel('settings'); return new Promise((r) => setTimeout(() => r([...document.querySelectorAll('.sheet .seg-b.on')].map((b) => b.textContent)), 700)); });
 
 try {
-  // 1. a brand-new phone: choose a language -> Play -> make your islander
+  // 1. a brand-new phone: choose a language -> Start a new family island -> make your islander
   const a = await phone('new');
   await a.goto(base);
   await a.waitForSelector('.lang-screen', { timeout: 90000 });
   await a.tap('.lang-pick .btn.primary');
   await a.waitForSelector('.screen.title');
   await wait(500);
-  await a.tap('.title-buttons .btn.primary');
-  await a.waitForSelector('.name-input');
-  await a.fill('.name-input', 'Leo');
-  await a.tap('.look-editor .btn.primary');
-  await a.waitForFunction(() => window.__game?.session?.state, null, { timeout: 90000 });
+  await startNewIsland(a, 'Leo');
   await wait(1500);
   let gr = await graphics(a);
   check(gr.quality === 'smooth' && gr.fps === 60, `a brand-new phone starts on Extra smooth (${gr.quality}, ${gr.fps} fps)`);
@@ -70,9 +67,7 @@ try {
   await b.goto(base + '&lang=en');
   await b.evaluate(() => { localStorage.clear(); localStorage.setItem('cozycove.profile', JSON.stringify({ id: 'pold0001', name: 'Mum', look: { skin: '#f1c9a5', shirt: '#e86b7a', accent: '#f6b04c', hair: '#2a1d16', hat: 'straw' }, tut: { moved: 1, fished: 1, board: 1, planted: 1 } })); });
   await b.goto(base + '&lang=en');
-  await b.waitForSelector('.screen.title', { timeout: 90000 });
-  await b.tap('.title-buttons .btn.primary');
-  await b.waitForFunction(() => window.__game?.session?.state, null, { timeout: 90000 });
+  await startNewIsland(b);
   gr = await graphics(b);
   check(gr.quality === 'cool' && gr.fps === 30, `a phone that played before keeps Cool & cozy (${gr.quality}, ${gr.fps} fps)`);
 

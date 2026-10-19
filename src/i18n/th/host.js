@@ -11,6 +11,7 @@ export default {
   '🏝️ The island is now called “{name}”!': '🏝️ ตอนนี้เกาะของเราชื่อ “{name}” แล้ว!',
   '🏅 New sticker for the family: {e} {name}!': '🏅 ครอบครัวได้สติกเกอร์ใหม่: {e} {name}!',
   '🏝️ {name} moved onto the island!': '🏝️ {name} ย้ายมาอยู่บนเกาะแล้ว!',
+  '🧳 {name} moved to another island. Come back any time!': '🧳 {name} ย้ายไปอยู่เกาะอื่นแล้ว กลับมาได้ทุกเมื่อเลยนะ!',
   '🧰 {name} fished up a treasure chest with {coins} coins!': '🧰 {name} ตกได้หีบสมบัติ ข้างในมี {coins} เหรียญ!',
   '📖 {name} discovered the {fish}! ({n}/{total} in the journal)': '📖 {name} เจอ{fish}เป็นครั้งแรก! (สมุดบันทึกปลา {n}/{total} ชนิด)',
   '✨ {name} caught a legendary {fish}!': '✨ {name} ตกได้{fish}ระดับตำนาน!',
@@ -26,7 +27,6 @@ export default {
   // ---------------------------------------------------------------- "you can't do that (yet)" replies
   'Captain Shelly has everything she needs today. Come back tomorrow!': 'วันนี้กัปตันเชลลี่ได้ของครบแล้ว พรุ่งนี้มาใหม่นะ!',
   'You need {n} more first.': 'ยังขาดอีก {n} นะ ไปหามาเพิ่มก่อนน้า',
-  'Only the host can rename the island.': 'เจ้าของเกาะเท่านั้นที่เปลี่ยนชื่อเกาะได้นะ',
   'Unknown action': 'ทำแบบนี้ไม่ได้นะ',
   'Oops, something went wrong.': 'อุ๊ย มีอะไรผิดพลาดนิดหน่อย',
   'That hat isn’t unlocked yet.': 'ยังไม่มีหมวกใบนี้นะ',
@@ -49,11 +49,10 @@ export default {
   'Already dug up today’s treasure. More tomorrow!': 'วันนี้ขุดสมบัติไปแล้ว พรุ่งนี้มาขุดใหม่นะ!',
 
   // ---------------------------------------------------------------- the connection (src/game/session.js)
-  'The host sent you home for now. 🏡': 'เจ้าของเกาะให้กลับบ้านไปก่อนนะ 🏡',
-  'Your game and the host’s game are different versions. Close and reopen both apps to update.': 'เกมของเรากับของเจ้าของเกาะเป็นคนละเวอร์ชันกัน ปิดแล้วเปิดเกมใหม่ทั้งสองเครื่องเพื่ออัปเดตนะ',
-  'This phone is already the host of this island. Use another phone to join!': 'มือถือเครื่องนี้เป็นเจ้าของเกาะนี้อยู่แล้ว ใช้มือถือเครื่องอื่นเข้าร่วมนะ!',
+  'Your game and the host’s game are different versions. Close and reopen both apps to update.': 'เกมของเรากับของมือถืออีกเครื่องเป็นคนละเวอร์ชันกัน ปิดแล้วเปิดเกมใหม่ทั้งสองเครื่องเพื่ออัปเดตนะ',
+  'Different versions of Cozy Cove: update both phones to play together.': 'เกมเป็นคนละเวอร์ชันกัน อัปเดตทั้งสองเครื่องก่อน แล้วจะเล่นด้วยกันได้นะ',
+  'This phone is already on the island.': 'มือถือเครื่องนี้อยู่บนเกาะนี้แล้วนะ',
   'This island is full (4 players). Try again when someone leaves.': 'เกาะนี้เต็มแล้ว (ผู้เล่น 4 คน) รอให้มีคนออกก่อน แล้วลองใหม่นะ',
-  'The host closed the island for now. 🌙': 'เจ้าของเกาะปิดเกาะไว้ก่อนนะ 🌙',
   'Connection lost.': 'การเชื่อมต่อหลุดแล้ว',
   'Reconnecting…': 'กำลังเชื่อมต่อใหม่…',
   'The island didn’t answer. Try again.': 'เกาะไม่ตอบกลับมาเลย ลองใหม่อีกทีนะ',
